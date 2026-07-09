@@ -23,6 +23,8 @@
 		A1000114 /* MapSizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000014 /* MapSizeSheet.swift */; };
 		A1000115 /* UploadSpotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000015 /* UploadSpotView.swift */; };
 		A1000116 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000016 /* SettingsView.swift */; };
+		A1000118 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000019 /* AppConstants.swift */; };
+		A1000119 /* MapSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000021 /* MapSearchService.swift */; };
 		A1000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000018 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -45,7 +47,9 @@
 		A1000016 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
 		A1000017 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A1000018 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A1000019 /* AppConstants.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppConstants.swift; sourceTree = "<group>"; };
 		A1000020 /* RestEasy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RestEasy.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1000021 /* MapSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -112,6 +116,7 @@
 			children = (
 				A1000006 /* LocationManager.swift */,
 				A1000007 /* SpotDataService.swift */,
+				A1000021 /* MapSearchService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -133,6 +138,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000003 /* AppTheme.swift */,
+				A1000019 /* AppConstants.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -281,6 +287,8 @@
 				A1000114 /* MapSizeSheet.swift in Sources */,
 				A1000115 /* UploadSpotView.swift in Sources */,
 				A1000116 /* SettingsView.swift in Sources */,
+				A1000118 /* AppConstants.swift in Sources */,
+				A1000119 /* MapSearchService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

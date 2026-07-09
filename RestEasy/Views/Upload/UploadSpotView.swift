@@ -155,7 +155,7 @@ struct UploadSpotView: View {
 
     private func submitSpot() {
         guard !address.isEmpty else { return }
-        let coordinate = locationManager.userLocation ?? CLLocationCoordinate2D(latitude: 42.48, longitude: -83.45)
+        let coordinate = locationManager.userLocation ?? AppConstants.defaultMapCenter
 
         let spot = RestingSpot(
             id: UUID(),

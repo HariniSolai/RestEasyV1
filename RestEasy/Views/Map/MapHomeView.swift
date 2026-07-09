@@ -7,6 +7,7 @@ struct MapHomeView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var spotService: SpotDataService
     @EnvironmentObject private var locationManager: LocationManager
+    @StateObject private var mapSearchService = MapSearchService()
 
     @State private var searchText = ""
     @State private var selectedSpot: RestingSpot?
@@ -16,15 +17,22 @@ struct MapHomeView: View {
     @State private var showSettings = false
     @State private var showMapSizeSheet = false
     @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var mapFocusCenter: CLLocationCoordinate2D?
+    @State private var isSearchingArea = false
+    @FocusState private var isSearchFieldFocused: Bool
 
-    private var filteredSpots: [RestingSpot] {
-        let base = locationManager.userLocation.map { spotService.spotsNear($0) } ?? spotService.spots
-        guard !searchText.isEmpty else { return base }
-        return base.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.address.localizedCaseInsensitiveContains(searchText) ||
-            $0.features.contains { $0.rawValue.localizedCaseInsensitiveContains(searchText) }
-        }
+    private var activeMapCenter: CLLocationCoordinate2D {
+        mapFocusCenter ?? locationManager.userLocation ?? AppConstants.defaultMapCenter
+    }
+
+    private var visibleSpots: [RestingSpot] {
+        spotService.spotsNear(activeMapCenter)
+    }
+
+    private var shouldShowSearchSuggestions: Bool {
+        isSearchFieldFocused &&
+        !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+        !mapSearchService.completions.isEmpty
     }
 
     private var mapSpan: MKCoordinateSpan {
@@ -37,9 +45,24 @@ struct MapHomeView: View {
             AppTheme.forestGreen.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                searchBar
-                    .padding(.horizontal, 16)
-                    .padding(.top, 8)
+                VStack(spacing: 8) {
+                    searchBar
+
+                    if shouldShowSearchSuggestions {
+                        searchSuggestionsList
+                    }
+
+                    if let searchError = mapSearchService.searchError {
+                        Text(searchError)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.cream.opacity(0.9))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                    }
+                }
+                .padding(.horizontal, 16)
+                .padding(.top, 8)
+                .zIndex(1)
 
                 mapSection
                     .padding(.horizontal, 16)
@@ -81,13 +104,27 @@ struct MapHomeView: View {
         }
         .onAppear {
             locationManager.requestLocation()
+            updateSearchRegion()
             updateCamera()
         }
         .onReceive(locationManager.$userLocation) { _ in
+            guard mapFocusCenter == nil else { return }
+            updateSearchRegion()
             updateCamera()
         }
         .onChange(of: appState.mapZoomLevel) { _, _ in
             updateCamera()
+        }
+        .onChange(of: searchText) { _, newValue in
+            mapSearchService.updateQuery(newValue)
+            updateSearchRegion()
+
+            if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                mapFocusCenter = nil
+                selectedSpot = nil
+                mapSearchService.clearCompletions()
+                updateCamera()
+            }
         }
         .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
             guard isAuthenticated, pendingUploadAfterAuth else { return }
@@ -100,9 +137,29 @@ struct MapHomeView: View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.black.opacity(0.6))
+
             TextField("Search an Area", text: $searchText)
                 .foregroundStyle(.black)
+                .focused($isSearchFieldFocused)
+                .submitLabel(.search)
+                .onSubmit {
+                    Task { await performAreaSearch() }
+                }
+
+            if isSearchingArea {
+                ProgressView()
+                    .tint(.black.opacity(0.6))
+            } else if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.black.opacity(0.45))
+                }
+            }
+
             Button {
+                isSearchFieldFocused = false
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape.fill")
@@ -115,9 +172,42 @@ struct MapHomeView: View {
         .clipShape(Capsule())
     }
 
+    private var searchSuggestionsList: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(Array(mapSearchService.completions.enumerated()), id: \.offset) { _, completion in
+                    Button {
+                        Task { await selectSearchCompletion(completion) }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(completion.title)
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.black)
+                            if !completion.subtitle.isEmpty {
+                                Text(completion.subtitle)
+                                    .font(.caption)
+                                    .foregroundStyle(.black.opacity(0.6))
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 12)
+                    }
+
+                    Divider()
+                        .padding(.leading, 16)
+                }
+            }
+        }
+        .frame(maxHeight: 220)
+        .background(AppTheme.cream)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+    }
+
     private var mapSection: some View {
         Map(position: $cameraPosition, selection: $selectedSpot) {
-            ForEach(filteredSpots) { spot in
+            ForEach(visibleSpots) { spot in
                 Marker(spot.name, coordinate: spot.coordinate)
                     .tint(AppTheme.forestGreen)
                     .tag(spot)
@@ -272,9 +362,48 @@ struct MapHomeView: View {
         }
     }
 
+    private func updateSearchRegion() {
+        mapSearchService.updateSearchRegion(
+            MKCoordinateRegion(center: activeMapCenter, span: mapSpan)
+        )
+    }
+
     private func updateCamera() {
-        let center = locationManager.userLocation ?? CLLocationCoordinate2D(latitude: 42.48, longitude: -83.45)
-        cameraPosition = .region(MKCoordinateRegion(center: center, span: mapSpan))
+        cameraPosition = .region(MKCoordinateRegion(center: activeMapCenter, span: mapSpan))
+    }
+
+    private func moveCamera(to region: MKCoordinateRegion) {
+        mapFocusCenter = region.center
+        cameraPosition = .region(region)
+        updateSearchRegion()
+    }
+
+    private func performAreaSearch() async {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !query.isEmpty else { return }
+
+        isSearchingArea = true
+        isSearchFieldFocused = false
+        mapSearchService.clearCompletions()
+        defer { isSearchingArea = false }
+
+        if let region = await mapSearchService.region(for: query) {
+            selectedSpot = nil
+            moveCamera(to: region)
+        }
+    }
+
+    private func selectSearchCompletion(_ completion: MKLocalSearchCompletion) async {
+        searchText = completion.title
+        isSearchFieldFocused = false
+        isSearchingArea = true
+        mapSearchService.clearCompletions()
+        defer { isSearchingArea = false }
+
+        if let region = await mapSearchService.region(for: completion) {
+            selectedSpot = nil
+            moveCamera(to: region)
+        }
     }
 
     private func openNavigation(to spot: RestingSpot) {
