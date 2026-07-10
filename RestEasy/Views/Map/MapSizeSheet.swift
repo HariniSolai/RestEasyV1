@@ -38,7 +38,10 @@ struct MapSizeSheet: View {
                         .font(.headline)
                         .foregroundStyle(AppTheme.forestGreen.opacity(0.8))
 
-                    Slider(value: $appState.mapZoomLevel, in: 0...1)
+                    Slider(
+                        value: $appState.mapZoomLevel,
+                        in: AppConstants.mapZoomRange
+                    )
                         .tint(AppTheme.forestGreen)
                         .padding(.horizontal, 32)
 

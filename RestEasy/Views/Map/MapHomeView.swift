@@ -1,6 +1,7 @@
 import SwiftUI
 import MapKit
 import Combine
+import UIKit
 
 /// Main map screen for discovering and navigating to resting spots.
 struct MapHomeView: View {
@@ -36,8 +37,18 @@ struct MapHomeView: View {
     }
 
     private var mapSpan: MKCoordinateSpan {
-        let delta = 0.15 - (appState.mapZoomLevel * 0.12)
+        let delta = AppConstants.mapSpanDelta(for: appState.mapZoomLevel)
         return MKCoordinateSpan(latitudeDelta: delta, longitudeDelta: delta)
+    }
+
+    private let zoomStep = 0.1
+
+    private var canZoomIn: Bool {
+        appState.mapZoomLevel < AppConstants.mapZoomRange.upperBound
+    }
+
+    private var canZoomOut: Bool {
+        appState.mapZoomLevel > AppConstants.mapZoomRange.lowerBound
     }
 
     var body: some View {
@@ -206,21 +217,65 @@ struct MapHomeView: View {
     }
 
     private var mapSection: some View {
-        Map(position: $cameraPosition, selection: $selectedSpot) {
-            ForEach(visibleSpots) { spot in
-                Marker(spot.name, coordinate: spot.coordinate)
-                    .tint(AppTheme.forestGreen)
-                    .tag(spot)
+        ZStack(alignment: .topTrailing) {
+            Map(position: $cameraPosition, selection: $selectedSpot) {
+                ForEach(visibleSpots) { spot in
+                    Marker(spot.name, coordinate: spot.coordinate)
+                        .tint(AppTheme.forestGreen)
+                        .tag(spot)
+                }
+                UserAnnotation()
             }
-            UserAnnotation()
+            .mapStyle(.standard(elevation: .realistic))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .frame(maxHeight: selectedSpot == nil ? .infinity : 220)
+            .animation(.easeInOut(duration: 0.3), value: selectedSpot?.id)
+            .onTapGesture(count: 2) {
+                showMapSizeSheet = true
+            }
+
+            zoomControls
+                .padding(12)
         }
-        .mapStyle(.standard(elevation: .realistic))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .frame(maxHeight: selectedSpot == nil ? .infinity : 220)
-        .animation(.easeInOut(duration: 0.3), value: selectedSpot?.id)
-        .onTapGesture(count: 2) {
-            showMapSizeSheet = true
+    }
+
+    private var zoomControls: some View {
+        VStack(spacing: 8) {
+            zoomButton(
+                systemName: "plus",
+                accessibilityLabel: "Zoom in",
+                isEnabled: canZoomIn
+            ) {
+                adjustZoom(by: zoomStep)
+            }
+
+            zoomButton(
+                systemName: "minus",
+                accessibilityLabel: "Zoom out",
+                isEnabled: canZoomOut
+            ) {
+                adjustZoom(by: -zoomStep)
+            }
         }
+    }
+
+    private func zoomButton(
+        systemName: String,
+        accessibilityLabel: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.body.bold())
+                .foregroundStyle(isEnabled ? .black : .black.opacity(0.35))
+                .frame(width: 40, height: 40)
+                .background(AppTheme.cream)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+        }
+        .disabled(!isEnabled)
+        .accessibilityLabel(accessibilityLabel)
     }
 
     private func spotDetailPanels(for spot: RestingSpot) -> some View {
@@ -245,6 +300,17 @@ struct MapHomeView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.white.opacity(0.7))
                 }
+            }
+
+            if let imageName = spot.imageName, UIImage(named: imageName) != nil {
+                Image(imageName)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 120)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .accessibilityLabel("Photo of \(spot.name)")
             }
 
             Text(spot.address)
@@ -370,6 +436,17 @@ struct MapHomeView: View {
 
     private func updateCamera() {
         cameraPosition = .region(MKCoordinateRegion(center: activeMapCenter, span: mapSpan))
+    }
+
+    /// Adjusts the map zoom level and recenters on the active map area.
+    /// - Parameter delta: Positive values zoom in; negative values zoom out.
+    private func adjustZoom(by delta: Double) {
+        let newLevel = min(
+            AppConstants.mapZoomRange.upperBound,
+            max(AppConstants.mapZoomRange.lowerBound, appState.mapZoomLevel + delta)
+        )
+        guard newLevel != appState.mapZoomLevel else { return }
+        appState.mapZoomLevel = newLevel
     }
 
     private func moveCamera(to region: MKCoordinateRegion) {

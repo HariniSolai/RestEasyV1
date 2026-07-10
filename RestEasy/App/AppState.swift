@@ -8,7 +8,7 @@ final class AppState: ObservableObject {
     @Published var userDisplayName = ""
     @Published var textSizeScale: Double = 1.0
     @Published var isHighContrastEnabled = false
-    @Published var mapZoomLevel: Double = 0.7
+    @Published var mapZoomLevel: Double = AppConstants.defaultMapZoomLevel
 
     /// Simulates a successful login for demo purposes.
     func login(email: String, password: String) {
