@@ -1034,7 +1034,7 @@ struct MapHomeView: View {
         isSearchingArea = true
         defer { isSearchingArea = false }
 
-        if let region = await mapSearchService.region(for: query) {
+        if let region = await mapSearchService.region(for: query, near: routeOrigin) {
             selectedSpot = nil
             moveCamera(to: region)
         }
@@ -1047,7 +1047,7 @@ struct MapHomeView: View {
         mapSearchService.clearCompletions()
         defer { isSearchingArea = false }
 
-        if let region = await mapSearchService.region(for: completion) {
+        if let region = await mapSearchService.region(for: completion, near: routeOrigin) {
             selectedSpot = nil
             moveCamera(to: region)
         }
