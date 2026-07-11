@@ -13,7 +13,7 @@ struct UploadSpotView: View {
     @State private var selectedFeatures: Set<SpotFeature> = []
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImage: Image?
-    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
 
     var body: some View {
         ZStack {
@@ -36,8 +36,15 @@ struct UploadSpotView: View {
 
                     VStack(spacing: 16) {
                         Map(position: $cameraPosition) {
-                            if let location = locationManager.userLocation {
-                                Marker("Your Location", coordinate: location)
+                            Annotation("You", coordinate: locationManager.userLocation) {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.white)
+                                        .frame(width: 22, height: 22)
+                                    Circle()
+                                        .fill(AppTheme.accentBlue)
+                                        .frame(width: 14, height: 14)
+                                }
                             }
                         }
                         .mapStyle(.standard)
@@ -45,12 +52,10 @@ struct UploadSpotView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 8))
                         .padding(.horizontal, 20)
                         .onAppear {
-                            if let location = locationManager.userLocation {
-                                cameraPosition = .region(MKCoordinateRegion(
-                                    center: location,
-                                    span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                                ))
-                            }
+                            cameraPosition = .region(MKCoordinateRegion(
+                                center: locationManager.userLocation,
+                                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+                            ))
                         }
 
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
@@ -125,9 +130,13 @@ struct UploadSpotView: View {
 
     private var featureChecklist: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Check all that apply:")
+            Text("Tag this spot (helps others search):")
                 .font(.subheadline.bold())
                 .foregroundStyle(.black.opacity(0.7))
+
+            Text("Select amenities like Bench, Restroom, or Park.")
+                .font(.caption)
+                .foregroundStyle(.black.opacity(0.55))
 
             ForEach(SpotFeature.allCases) { feature in
                 Button {
@@ -140,7 +149,7 @@ struct UploadSpotView: View {
                     HStack {
                         Image(systemName: selectedFeatures.contains(feature) ? "checkmark.square.fill" : "square")
                             .foregroundStyle(AppTheme.forestGreen)
-                        Text(feature.rawValue)
+                        Label(feature.rawValue, systemImage: feature.systemImage)
                             .foregroundStyle(.black)
                         Spacer()
                     }
@@ -155,7 +164,7 @@ struct UploadSpotView: View {
 
     private func submitSpot() {
         guard !address.isEmpty else { return }
-        let coordinate = locationManager.userLocation ?? AppConstants.defaultMapCenter
+        let coordinate = locationManager.userLocation
 
         let spot = RestingSpot(
             id: UUID(),

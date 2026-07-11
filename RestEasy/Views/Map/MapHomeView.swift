@@ -9,31 +9,70 @@ struct MapHomeView: View {
     @EnvironmentObject private var spotService: SpotDataService
     @EnvironmentObject private var locationManager: LocationManager
     @StateObject private var mapSearchService = MapSearchService()
+    @StateObject private var directionsService = DirectionsService()
 
     @State private var searchText = ""
+    @State private var selectedFeatureFilters: Set<SpotFeature> = []
     @State private var selectedSpot: RestingSpot?
     @State private var showUploadSheet = false
     @State private var showAuthSheet = false
     @State private var pendingUploadAfterAuth = false
     @State private var showSettings = false
     @State private var showMapSizeSheet = false
-    @State private var cameraPosition: MapCameraPosition = .automatic
+    @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
     @State private var mapFocusCenter: CLLocationCoordinate2D?
     @State private var isSearchingArea = false
+    @State private var isNavigating = false
+    @State private var isLiveGuidance = false
     @FocusState private var isSearchFieldFocused: Bool
 
+    /// Origin used for routing: live GPS when available, otherwise Chicago.
+    private var routeOrigin: CLLocationCoordinate2D {
+        locationManager.userLocation
+    }
+
+    private var isUsingFallbackOrigin: Bool {
+        locationManager.isApproximateLocation
+    }
+
     private var activeMapCenter: CLLocationCoordinate2D {
-        mapFocusCenter ?? locationManager.userLocation ?? AppConstants.defaultMapCenter
+        mapFocusCenter ?? locationManager.userLocation
     }
 
     private var visibleSpots: [RestingSpot] {
-        spotService.spotsNear(activeMapCenter)
+        spotService.spotsNear(
+            activeMapCenter,
+            requiredFeatures: selectedFeatureFilters
+        )
+    }
+
+    private var matchingSpotSuggestions: [RestingSpot] {
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isSearchFieldFocused, !trimmedQuery.isEmpty else { return [] }
+        return Array(
+            spotService.spotsNear(
+                activeMapCenter,
+                requiredFeatures: selectedFeatureFilters,
+                query: trimmedQuery
+            ).prefix(5)
+        )
+    }
+
+    private var matchingFeatureSuggestions: [SpotFeature] {
+        let trimmedQuery = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard isSearchFieldFocused, !trimmedQuery.isEmpty else { return [] }
+        return SpotFeature.features(matching: trimmedQuery)
+            .filter { !selectedFeatureFilters.contains($0) }
     }
 
     private var shouldShowSearchSuggestions: Bool {
         isSearchFieldFocused &&
         !searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
-        !mapSearchService.completions.isEmpty
+        (
+            !mapSearchService.completions.isEmpty ||
+            !matchingSpotSuggestions.isEmpty ||
+            !matchingFeatureSuggestions.isEmpty
+        )
     }
 
     private var mapSpan: MKCoordinateSpan {
@@ -59,12 +98,22 @@ struct MapHomeView: View {
                 VStack(spacing: 8) {
                     searchBar
 
+                    featureFilterChips
+
                     if shouldShowSearchSuggestions {
                         searchSuggestionsList
                     }
 
                     if let searchError = mapSearchService.searchError {
                         Text(searchError)
+                            .font(.caption)
+                            .foregroundStyle(AppTheme.cream.opacity(0.9))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 8)
+                    }
+
+                    if !selectedFeatureFilters.isEmpty && visibleSpots.isEmpty {
+                        Text("No resting spots match those filters nearby.")
                             .font(.caption)
                             .foregroundStyle(AppTheme.cream.opacity(0.9))
                             .frame(maxWidth: .infinity, alignment: .leading)
@@ -80,8 +129,16 @@ struct MapHomeView: View {
                     .padding(.vertical, 12)
 
                 if let spot = selectedSpot {
-                    spotDetailPanels(for: spot)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    if isLiveGuidance {
+                        liveGuidancePanel(for: spot)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else if isNavigating {
+                        activeNavigationPanel(for: spot)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    } else {
+                        spotDetailPanels(for: spot)
+                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
 
                 Spacer(minLength: 0)
@@ -91,10 +148,12 @@ struct MapHomeView: View {
                 Spacer()
                 HStack {
                     Spacer()
-                    addButton
+                    if !isNavigating && !isLiveGuidance {
+                        addButton
+                    }
                 }
                 .padding(.trailing, 24)
-                .padding(.bottom, selectedSpot == nil ? 32 : 16)
+                .padding(.bottom, selectedSpot == nil || isNavigating || isLiveGuidance ? 32 : 16)
             }
         }
         .sheet(isPresented: $showUploadSheet) {
@@ -119,11 +178,18 @@ struct MapHomeView: View {
             updateCamera()
         }
         .onReceive(locationManager.$userLocation) { _ in
-            guard mapFocusCenter == nil else { return }
-            updateSearchRegion()
-            updateCamera()
+            if isLiveGuidance {
+                handleLiveLocationUpdate()
+            } else {
+                recenterOnUserIfNeeded()
+            }
+        }
+        .onReceive(locationManager.$headingDegrees) { _ in
+            guard isLiveGuidance else { return }
+            updateFollowCamera()
         }
         .onChange(of: appState.mapZoomLevel) { _, _ in
+            guard !isLiveGuidance else { return }
             updateCamera()
         }
         .onChange(of: searchText) { _, newValue in
@@ -131,10 +197,7 @@ struct MapHomeView: View {
             updateSearchRegion()
 
             if newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                mapFocusCenter = nil
-                selectedSpot = nil
-                mapSearchService.clearCompletions()
-                updateCamera()
+                clearSearchAndSelection()
             }
         }
         .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
@@ -142,6 +205,51 @@ struct MapHomeView: View {
             pendingUploadAfterAuth = false
             showUploadSheet = true
         }
+        .onChange(of: selectedSpot) { _, spot in
+            if spot == nil {
+                endAllNavigation()
+            }
+            guard !isLiveGuidance else { return }
+            Task { await refreshDirections(for: spot) }
+        }
+        .onChange(of: directionsService.travelMode) { _, _ in
+            guard !isLiveGuidance else { return }
+            Task { await refreshDirections(for: selectedSpot) }
+        }
+        .onChange(of: locationManager.isApproximateLocation) { _, isApproximate in
+            guard !isApproximate, selectedSpot != nil, !isLiveGuidance else { return }
+            Task { await refreshDirections(for: selectedSpot) }
+        }
+    }
+
+    /// Recenters the map on the user when they have not manually moved the focus.
+    private func recenterOnUserIfNeeded() {
+        guard mapFocusCenter == nil, !isNavigating, !isLiveGuidance else { return }
+        updateSearchRegion()
+        updateCamera()
+    }
+
+    /// Clears search text side effects and restores the default map focus.
+    private func clearSearchAndSelection() {
+        mapFocusCenter = nil
+        selectedSpot = nil
+        endAllNavigation()
+        directionsService.clear()
+        mapSearchService.clearCompletions()
+        updateCamera()
+    }
+
+    /// Clears amenity filters and restores the unfiltered nearby map.
+    private func clearFeatureFilters() {
+        selectedFeatureFilters.removeAll()
+    }
+
+    /// Leaves both route-review and live-guidance modes.
+    private func endAllNavigation() {
+        isNavigating = false
+        isLiveGuidance = false
+        locationManager.stopHeadingUpdates()
+        directionsService.clearLiveProgressOnly()
     }
 
     private var searchBar: some View {
@@ -149,12 +257,12 @@ struct MapHomeView: View {
             Image(systemName: "magnifyingglass")
                 .foregroundStyle(.black.opacity(0.6))
 
-            TextField("Search an Area", text: $searchText)
+            TextField("Search area, bench, restroom…", text: $searchText)
                 .foregroundStyle(.black)
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
                 .onSubmit {
-                    Task { await performAreaSearch() }
+                    Task { await performExpandedSearch() }
                 }
 
             if isSearchingArea {
@@ -183,37 +291,195 @@ struct MapHomeView: View {
         .clipShape(Capsule())
     }
 
+    /// Horizontal amenity chips so users can filter spots by tagged needs.
+    private var featureFilterChips: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(SpotFeature.allCases) { feature in
+                    let isSelected = selectedFeatureFilters.contains(feature)
+                    Button {
+                        toggleFeatureFilter(feature)
+                    } label: {
+                        Label(feature.rawValue, systemImage: feature.systemImage)
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(isSelected ? AppTheme.forestGreen : .black.opacity(0.75))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(isSelected ? AppTheme.cream : AppTheme.cream.opacity(0.55))
+                            .clipShape(Capsule())
+                            .overlay(
+                                Capsule()
+                                    .stroke(isSelected ? AppTheme.sageGreen : Color.clear, lineWidth: 1.5)
+                            )
+                    }
+                    .accessibilityLabel("\(feature.rawValue) filter")
+                    .accessibilityAddTraits(isSelected ? .isSelected : [])
+                }
+
+                if !selectedFeatureFilters.isEmpty {
+                    Button {
+                        clearFeatureFilters()
+                    } label: {
+                        Text("Clear")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.black.opacity(0.7))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(AppTheme.cream.opacity(0.4))
+                            .clipShape(Capsule())
+                    }
+                    .accessibilityLabel("Clear amenity filters")
+                }
+            }
+            .padding(.horizontal, 2)
+        }
+    }
+
     private var searchSuggestionsList: some View {
         ScrollView {
             VStack(spacing: 0) {
-                ForEach(Array(mapSearchService.completions.enumerated()), id: \.offset) { _, completion in
-                    Button {
-                        Task { await selectSearchCompletion(completion) }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(completion.title)
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundStyle(.black)
-                            if !completion.subtitle.isEmpty {
-                                Text(completion.subtitle)
-                                    .font(.caption)
-                                    .foregroundStyle(.black.opacity(0.6))
-                            }
+                if !matchingFeatureSuggestions.isEmpty {
+                    suggestionSectionHeader("Amenities")
+                    ForEach(matchingFeatureSuggestions) { feature in
+                        Button {
+                            applyFeatureSuggestion(feature)
+                        } label: {
+                            suggestionRow(
+                                title: feature.rawValue,
+                                subtitle: "Filter resting spots tagged \(feature.rawValue.lowercased())",
+                                systemImage: feature.systemImage
+                            )
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 12)
+                        Divider().padding(.leading, 16)
                     }
+                }
 
-                    Divider()
-                        .padding(.leading, 16)
+                if !matchingSpotSuggestions.isEmpty {
+                    suggestionSectionHeader("Resting Spots")
+                    ForEach(matchingSpotSuggestions) { spot in
+                        Button {
+                            selectSpotSuggestion(spot)
+                        } label: {
+                            suggestionRow(
+                                title: spot.name,
+                                subtitle: spotFeatureSummary(for: spot),
+                                systemImage: "mappin.circle.fill"
+                            )
+                        }
+                        Divider().padding(.leading, 16)
+                    }
+                }
+
+                if !mapSearchService.completions.isEmpty {
+                    suggestionSectionHeader("Areas")
+                    ForEach(Array(mapSearchService.completions.enumerated()), id: \.offset) { _, completion in
+                        Button {
+                            Task { await selectSearchCompletion(completion) }
+                        } label: {
+                            suggestionRow(
+                                title: completion.title,
+                                subtitle: completion.subtitle.isEmpty ? "Map area" : completion.subtitle,
+                                systemImage: "map"
+                            )
+                        }
+                        Divider().padding(.leading, 16)
+                    }
                 }
             }
         }
-        .frame(maxHeight: 220)
+        .frame(maxHeight: 260)
         .background(AppTheme.cream)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.12), radius: 8, y: 4)
+    }
+
+    /// Section label inside the combined search suggestions dropdown.
+    /// - Parameter title: The section name to display.
+    /// - Returns: A small header view for grouping suggestions.
+    private func suggestionSectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.black.opacity(0.45))
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 16)
+            .padding(.top, 10)
+            .padding(.bottom, 4)
+    }
+
+    /// A single row in the search suggestions list.
+    /// - Parameters:
+    ///   - title: Primary suggestion text.
+    ///   - subtitle: Supporting detail under the title.
+    ///   - systemImage: Leading SF Symbol name.
+    /// - Returns: A styled suggestion row.
+    private func suggestionRow(title: String, subtitle: String, systemImage: String) -> some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: systemImage)
+                .foregroundStyle(AppTheme.forestGreen)
+                .frame(width: 20)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.black)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.black.opacity(0.6))
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+    }
+
+    /// Short amenity summary used under spot search suggestions.
+    /// - Parameter spot: The resting spot being suggested.
+    /// - Returns: A comma-separated feature list or a fallback address.
+    private func spotFeatureSummary(for spot: RestingSpot) -> String {
+        if spot.features.isEmpty {
+            return spot.address
+        }
+        return spot.features.map(\.rawValue).joined(separator: " · ")
+    }
+
+    /// Toggles an amenity chip on or off in the active filter set.
+    /// - Parameter feature: The amenity tag to toggle.
+    private func toggleFeatureFilter(_ feature: SpotFeature) {
+        if selectedFeatureFilters.contains(feature) {
+            selectedFeatureFilters.remove(feature)
+        } else {
+            selectedFeatureFilters.insert(feature)
+        }
+
+        if let selectedSpot, !visibleSpots.contains(where: { $0.id == selectedSpot.id }) {
+            self.selectedSpot = nil
+            endAllNavigation()
+            directionsService.clear()
+        }
+    }
+
+    /// Applies an amenity suggestion as an active filter chip.
+    /// - Parameter feature: The amenity chosen from search suggestions.
+    private func applyFeatureSuggestion(_ feature: SpotFeature) {
+        selectedFeatureFilters.insert(feature)
+        searchText = feature.rawValue
+        isSearchFieldFocused = false
+        mapSearchService.clearCompletions()
+    }
+
+    /// Selects a resting spot from search suggestions and centers the map on it.
+    /// - Parameter spot: The suggested resting spot.
+    private func selectSpotSuggestion(_ spot: RestingSpot) {
+        searchText = spot.name
+        isSearchFieldFocused = false
+        mapSearchService.clearCompletions()
+        selectedSpot = spot
+        moveCamera(
+            to: MKCoordinateRegion(
+                center: spot.coordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            )
+        )
     }
 
     private var mapSection: some View {
@@ -224,18 +490,48 @@ struct MapHomeView: View {
                         .tint(AppTheme.forestGreen)
                         .tag(spot)
                 }
-                UserAnnotation()
+
+                if let routeCoordinates = directionsService.route?.coordinates,
+                   routeCoordinates.count >= 2 {
+                    MapPolyline(coordinates: routeCoordinates)
+                        .stroke(AppTheme.accentBlue, lineWidth: 5)
+                }
+
+                userLocationMarker
             }
             .mapStyle(.standard(elevation: .realistic))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .frame(maxHeight: selectedSpot == nil ? .infinity : 220)
+            .frame(maxHeight: selectedSpot == nil || isNavigating || isLiveGuidance ? .infinity : 220)
             .animation(.easeInOut(duration: 0.3), value: selectedSpot?.id)
+            .animation(.easeInOut(duration: 0.3), value: isNavigating)
+            .animation(.easeInOut(duration: 0.3), value: isLiveGuidance)
             .onTapGesture(count: 2) {
                 showMapSizeSheet = true
             }
 
             zoomControls
                 .padding(12)
+        }
+    }
+
+    /// Blue "you are here" pin; rotates with compass heading during live guidance.
+    @MapContentBuilder
+    private var userLocationMarker: some MapContent {
+        Annotation("You", coordinate: locationManager.userLocation) {
+            ZStack {
+                Circle()
+                    .fill(Color.white)
+                    .frame(width: 26, height: 26)
+                Image(systemName: isLiveGuidance ? "location.north.fill" : "circle.fill")
+                    .font(isLiveGuidance ? .body : .caption)
+                    .foregroundStyle(AppTheme.accentBlue)
+                    .rotationEffect(.degrees(isLiveGuidance ? (locationManager.headingDegrees ?? 0) : 0))
+            }
+            .accessibilityLabel(
+                locationManager.isApproximateLocation
+                ? "Your location, Chicago default"
+                : "Your current location"
+            )
         }
     }
 
@@ -296,6 +592,8 @@ struct MapHomeView: View {
                 Spacer()
                 Button {
                     selectedSpot = nil
+                    endAllNavigation()
+                    directionsService.clear()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(.white.opacity(0.7))
@@ -343,16 +641,174 @@ struct MapHomeView: View {
                 }
             }
 
-            Button {
-                openNavigation(to: spot)
-            } label: {
-                Label("Navigate", systemImage: "location.fill")
-                    .font(.subheadline.bold())
-                    .foregroundStyle(.black)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(AppTheme.cream)
-                    .clipShape(Capsule())
+            directionsSection(for: spot)
+        }
+        .padding(16)
+        .background(AppTheme.forestGreen.opacity(0.95))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.sageGreen, lineWidth: 1)
+        )
+    }
+
+    /// Shows travel mode, ETA, and in-app navigation controls for a selected spot.
+    /// - Parameter spot: The resting spot currently selected on the map.
+    /// - Returns: The directions controls shown in the spot detail panel.
+    @ViewBuilder
+    private func directionsSection(for spot: RestingSpot) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Directions")
+                .font(.subheadline.bold())
+                .foregroundStyle(.white)
+
+            Picker("Travel mode", selection: $directionsService.travelMode) {
+                ForEach(TravelMode.allCases) { mode in
+                    Label(mode.title, systemImage: mode.systemImage)
+                        .tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+            .accessibilityLabel("Travel mode")
+
+            if directionsService.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("Calculating route…")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            } else if let route = directionsService.route {
+                HStack(spacing: 16) {
+                    Label(route.formattedETA, systemImage: "clock.fill")
+                    Label(route.formattedDistance, systemImage: "arrow.triangle.turn.up.right.diamond.fill")
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.cream)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("Estimated time \(route.formattedETA), distance \(route.formattedDistance)")
+
+                if isUsingFallbackOrigin {
+                    Text("Showing Chicago as your location. On a real device with location allowed, RestEasy tracks where you are.")
+                        .font(.caption2)
+                        .foregroundStyle(.white.opacity(0.7))
+                }
+
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isNavigating = true
+                        isLiveGuidance = false
+                    }
+                    fitCamera(to: route.coordinates, destination: spot.coordinate)
+                } label: {
+                    Label("Review Route", systemImage: "list.bullet")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(AppTheme.cream)
+                        .clipShape(Capsule())
+                }
+                .accessibilityHint("Shows the full path, ETA, and turn list before you start walking")
+            } else if let errorMessage = directionsService.errorMessage {
+                Text(errorMessage)
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.85))
+            }
+        }
+    }
+
+    /// Route-review panel: full path overview, ETA, and step list before confirming the trip.
+    /// - Parameter spot: The destination resting spot.
+    /// - Returns: The review UI shown after tapping Review Route.
+    private func activeNavigationPanel(for spot: RestingSpot) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Route to")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+                    Text(spot.name)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+                Button {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        isNavigating = false
+                    }
+                } label: {
+                    Text("Back")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(AppTheme.cream)
+                        .clipShape(Capsule())
+                }
+                .accessibilityLabel("Back to spot details")
+            }
+
+            if let route = directionsService.route {
+                HStack(spacing: 16) {
+                    Label(route.formattedETA, systemImage: "clock.fill")
+                    Label(route.formattedDistance, systemImage: directionsService.travelMode.systemImage)
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(AppTheme.cream)
+
+                if route.steps.isEmpty {
+                    Text("Follow the blue route on the map to reach this spot.")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                } else {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(Array(route.steps.enumerated()), id: \.element.id) { index, step in
+                                HStack(alignment: .top, spacing: 10) {
+                                    Text("\(index + 1)")
+                                        .font(.caption.bold())
+                                        .foregroundStyle(.black)
+                                        .frame(width: 22, height: 22)
+                                        .background(AppTheme.cream)
+                                        .clipShape(Circle())
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(step.instruction)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.white)
+                                        Text(step.formattedDistance)
+                                            .font(.caption)
+                                            .foregroundStyle(.white.opacity(0.7))
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .frame(maxHeight: 140)
+                }
+
+                Button {
+                    beginLiveGuidance(to: spot)
+                } label: {
+                    Label("Confirm & Go", systemImage: "location.north.line.fill")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.black)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(AppTheme.cream)
+                        .clipShape(Capsule())
+                }
+                .accessibilityHint("Starts live guidance that follows you along the route")
+            } else if directionsService.isLoading {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("Updating directions…")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
             }
         }
         .padding(16)
@@ -362,6 +818,86 @@ struct MapHomeView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppTheme.sageGreen, lineWidth: 1)
         )
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
+    }
+
+    /// Live guidance panel with the next-turn banner after the user confirms the trip.
+    /// - Parameter spot: The destination resting spot.
+    /// - Returns: The compact live-navigation UI.
+    private func liveGuidancePanel(for spot: RestingSpot) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Going to")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.75))
+                    Text(spot.name)
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                }
+                Spacer()
+                Button {
+                    endLiveGuidance(returnToReview: true)
+                } label: {
+                    Text("End")
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(AppTheme.cream)
+                        .clipShape(Capsule())
+                }
+                .accessibilityLabel("End live navigation")
+            }
+
+            if directionsService.isRerouting {
+                HStack(spacing: 8) {
+                    ProgressView()
+                        .tint(.white)
+                    Text("Recalculating route…")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+            } else if let progress = directionsService.liveProgress {
+                Text(progress.bannerText)
+                    .font(.title3.bold())
+                    .foregroundStyle(AppTheme.cream)
+                    .accessibilityLabel(progress.bannerText)
+
+                HStack(spacing: 16) {
+                    Label(progress.formattedRemainingETA, systemImage: "clock.fill")
+                    Label(
+                        RouteStep.formatDistance(progress.remainingDistanceMeters),
+                        systemImage: directionsService.travelMode.systemImage
+                    )
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white.opacity(0.9))
+            } else if let route = directionsService.route {
+                Text("Follow the blue route to \(spot.name).")
+                    .font(.subheadline.bold())
+                    .foregroundStyle(AppTheme.cream)
+                Label(route.formattedETA, systemImage: "clock.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.9))
+            }
+
+            if isUsingFallbackOrigin {
+                Text("Live GPS follow works best on a real device with location allowed.")
+                    .font(.caption2)
+                    .foregroundStyle(.white.opacity(0.7))
+            }
+        }
+        .padding(16)
+        .background(AppTheme.forestGreen.opacity(0.95))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(AppTheme.sageGreen, lineWidth: 1)
+        )
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
     }
 
     private func reviewsPanel(for spot: RestingSpot) -> some View {
@@ -455,13 +991,47 @@ struct MapHomeView: View {
         updateSearchRegion()
     }
 
-    private func performAreaSearch() async {
+    private func performExpandedSearch() async {
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !query.isEmpty else { return }
 
-        isSearchingArea = true
         isSearchFieldFocused = false
         mapSearchService.clearCompletions()
+
+        let matchingFeatures = SpotFeature.features(matching: query)
+        if let firstFeature = matchingFeatures.first {
+            selectedFeatureFilters.insert(firstFeature)
+        }
+
+        let matchingSpots = spotService.spotsNear(
+            activeMapCenter,
+            requiredFeatures: selectedFeatureFilters,
+            query: query
+        )
+
+        if let firstSpot = matchingSpots.first, matchingFeatures.isEmpty == false || matchingSpots.count == 1 {
+            selectedSpot = firstSpot
+            moveCamera(
+                to: MKCoordinateRegion(
+                    center: firstSpot.coordinate,
+                    span: MKCoordinateSpan(latitudeDelta: 0.02, longitudeDelta: 0.02)
+                )
+            )
+            return
+        }
+
+        if !matchingSpots.isEmpty {
+            let center = matchingSpots[0].coordinate
+            moveCamera(
+                to: MKCoordinateRegion(
+                    center: center,
+                    span: MKCoordinateSpan(latitudeDelta: 0.03, longitudeDelta: 0.03)
+                )
+            )
+            return
+        }
+
+        isSearchingArea = true
         defer { isSearchingArea = false }
 
         if let region = await mapSearchService.region(for: query) {
@@ -483,10 +1053,124 @@ struct MapHomeView: View {
         }
     }
 
-    private func openNavigation(to spot: RestingSpot) {
-        spot.mapItem.openInMaps(launchOptions: [
-            MKLaunchOptionsDirectionsModeKey: MKLaunchOptionsDirectionsModeWalking
-        ])
+    /// Requests an in-app route and ETA for the selected resting spot.
+    /// - Parameter spot: The spot to navigate to, or `nil` to clear directions.
+    private func refreshDirections(for spot: RestingSpot?) async {
+        guard let spot else {
+            directionsService.clear()
+            return
+        }
+
+        await directionsService.calculateRoute(from: routeOrigin, to: spot.coordinate)
+
+        if let route = directionsService.route, !isLiveGuidance {
+            fitCamera(to: route.coordinates, destination: spot.coordinate)
+        }
+    }
+
+    /// Starts live follow-mode guidance after the user confirms the reviewed route.
+    /// - Parameter spot: The destination resting spot.
+    private func beginLiveGuidance(to spot: RestingSpot) {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isLiveGuidance = true
+            isNavigating = true
+        }
+        locationManager.startHeadingUpdates()
+        directionsService.updateLiveProgress(at: locationManager.userLocation)
+        updateFollowCamera()
+    }
+
+    /// Ends live guidance and optionally returns to the route-review panel.
+    /// - Parameter returnToReview: When `true`, keeps the reviewed route visible.
+    private func endLiveGuidance(returnToReview: Bool) {
+        locationManager.stopHeadingUpdates()
+        directionsService.clearLiveProgressOnly()
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isLiveGuidance = false
+            isNavigating = returnToReview
+        }
+
+        if returnToReview, let route = directionsService.route, let spot = selectedSpot {
+            fitCamera(to: route.coordinates, destination: spot.coordinate)
+        }
+    }
+
+    /// Updates step progress, follow camera, and reroutes when the user leaves the path.
+    private func handleLiveLocationUpdate() {
+        guard isLiveGuidance, let spot = selectedSpot else { return }
+
+        directionsService.updateLiveProgress(at: locationManager.userLocation)
+        updateFollowCamera()
+
+        guard directionsService.isOffRoute(at: locationManager.userLocation),
+              directionsService.canRerouteNow() else { return }
+
+        Task {
+            await directionsService.calculateRoute(
+                from: locationManager.userLocation,
+                to: spot.coordinate,
+                isReroute: true
+            )
+            directionsService.updateLiveProgress(at: locationManager.userLocation)
+            updateFollowCamera()
+        }
+    }
+
+    /// Zooms the camera onto the user and rotates with heading during live guidance.
+    private func updateFollowCamera() {
+        guard isLiveGuidance else { return }
+
+        let heading = locationManager.headingDegrees ?? 0
+        cameraPosition = .camera(
+            MapCamera(
+                centerCoordinate: locationManager.userLocation,
+                distance: AppConstants.liveNavigationCameraDistance,
+                heading: heading,
+                pitch: 50
+            )
+        )
+        mapFocusCenter = locationManager.userLocation
+        updateSearchRegion()
+    }
+
+    /// Zooms the map so the full route from the user to the spot is visible.
+    /// - Parameters:
+    ///   - coordinates: The route polyline coordinates.
+    ///   - destination: The resting spot coordinate used as a fallback endpoint.
+    private func fitCamera(
+        to coordinates: [CLLocationCoordinate2D],
+        destination: CLLocationCoordinate2D
+    ) {
+        var points = coordinates
+        points.append(routeOrigin)
+        points.append(destination)
+
+        guard let firstPoint = points.first else { return }
+
+        var minLatitude = firstPoint.latitude
+        var maxLatitude = firstPoint.latitude
+        var minLongitude = firstPoint.longitude
+        var maxLongitude = firstPoint.longitude
+
+        for point in points.dropFirst() {
+            minLatitude = min(minLatitude, point.latitude)
+            maxLatitude = max(maxLatitude, point.latitude)
+            minLongitude = min(minLongitude, point.longitude)
+            maxLongitude = max(maxLongitude, point.longitude)
+        }
+
+        let center = CLLocationCoordinate2D(
+            latitude: (minLatitude + maxLatitude) / 2,
+            longitude: (minLongitude + maxLongitude) / 2
+        )
+        let span = MKCoordinateSpan(
+            latitudeDelta: max((maxLatitude - minLatitude) * 1.4, 0.005),
+            longitudeDelta: max((maxLongitude - minLongitude) * 1.4, 0.005)
+        )
+
+        mapFocusCenter = center
+        cameraPosition = .region(MKCoordinateRegion(center: center, span: span))
+        updateSearchRegion()
     }
 }
 

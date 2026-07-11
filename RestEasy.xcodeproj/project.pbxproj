@@ -26,6 +26,7 @@
 		A1000118 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000019 /* AppConstants.swift */; };
 		A1000119 /* MapSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000021 /* MapSearchService.swift */; };
 		A1000120 /* SeedSpots.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022 /* SeedSpots.swift */; };
+		A1000121 /* DirectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000023 /* DirectionsService.swift */; };
 		A1000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000018 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
 
@@ -52,6 +53,7 @@
 		A1000020 /* RestEasy.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RestEasy.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A1000021 /* MapSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchService.swift; sourceTree = "<group>"; };
 		A1000022 /* SeedSpots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSpots.swift; sourceTree = "<group>"; };
+		A1000023 /* DirectionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -128,6 +130,7 @@
 				A1000006 /* LocationManager.swift */,
 				A1000007 /* SpotDataService.swift */,
 				A1000021 /* MapSearchService.swift */,
+				A1000023 /* DirectionsService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -301,6 +304,7 @@
 				A1000118 /* AppConstants.swift in Sources */,
 				A1000119 /* MapSearchService.swift in Sources */,
 				A1000120 /* SeedSpots.swift in Sources */,
+				A1000121 /* DirectionsService.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

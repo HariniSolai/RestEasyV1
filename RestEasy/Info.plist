@@ -23,7 +23,7 @@
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>RestEasy uses your location to find nearby resting spots and restrooms.</string>
+	<string>RestEasy uses your location and heading to find nearby resting spots and guide you there with live directions.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>RestEasy needs photo access so you can upload images of resting spots.</string>
 	<key>UIApplicationSceneManifest</key>

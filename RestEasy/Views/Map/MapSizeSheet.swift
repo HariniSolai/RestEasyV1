@@ -4,6 +4,7 @@ import MapKit
 /// Sheet for adjusting map zoom level before confirming.
 struct MapSizeSheet: View {
     @EnvironmentObject private var appState: AppState
+    @EnvironmentObject private var locationManager: LocationManager
     @Environment(\.dismiss) private var dismiss
     @Binding var cameraPosition: MapCameraPosition
 
@@ -27,7 +28,16 @@ struct MapSizeSheet: View {
 
                 VStack(spacing: 20) {
                     Map(position: $cameraPosition) {
-                        UserAnnotation()
+                        Annotation("You", coordinate: locationManager.userLocation) {
+                            ZStack {
+                                Circle()
+                                    .fill(Color.white)
+                                    .frame(width: 22, height: 22)
+                                Circle()
+                                    .fill(AppTheme.accentBlue)
+                                    .frame(width: 14, height: 14)
+                            }
+                        }
                     }
                     .mapStyle(.standard)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -82,6 +92,7 @@ struct MapSizeSheet: View {
 }
 
 #Preview {
-    MapSizeSheet(cameraPosition: .constant(.automatic))
+    MapSizeSheet(cameraPosition: .constant(.region(AppConstants.defaultMapRegion)))
         .environmentObject(AppState())
+        .environmentObject(LocationManager())
 }
