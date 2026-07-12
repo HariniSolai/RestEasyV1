@@ -1,10 +1,16 @@
+import FirebaseCore
 import SwiftUI
 
 @main
 struct RestEasyApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var appState = AppState()
     @StateObject private var spotService = SpotDataService()
     @StateObject private var locationManager = LocationManager()
+
+    init() {
+        FirebaseApp.configure()
+    }
 
     var body: some Scene {
         WindowGroup {

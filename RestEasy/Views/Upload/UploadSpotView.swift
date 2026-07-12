@@ -1,9 +1,11 @@
 import SwiftUI
 import MapKit
 import PhotosUI
+import UIKit
 
 /// Form for users to contribute a new resting spot.
 struct UploadSpotView: View {
+    @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var spotService: SpotDataService
     @EnvironmentObject private var locationManager: LocationManager
     @Environment(\.dismiss) private var dismiss
@@ -13,7 +15,10 @@ struct UploadSpotView: View {
     @State private var selectedFeatures: Set<SpotFeature> = []
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var selectedImage: Image?
+    @State private var selectedImageData: Data?
     @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
+    @State private var isUploading = false
+    @State private var uploadErrorMessage: String?
 
     var body: some View {
         ZStack {
@@ -84,6 +89,7 @@ struct UploadSpotView: View {
                             Task {
                                 if let data = try? await newItem?.loadTransferable(type: Data.self),
                                    let uiImage = UIImage(data: data) {
+                                    selectedImageData = data
                                     selectedImage = Image(uiImage: uiImage)
                                 }
                             }
@@ -105,8 +111,8 @@ struct UploadSpotView: View {
 
                         HStack {
                             Spacer()
-                            Button("Upload") {
-                                submitSpot()
+                            Button(isUploading ? "Uploading..." : "Upload") {
+                                Task { await submitSpot() }
                             }
                             .font(.headline)
                             .foregroundStyle(.black)
@@ -114,6 +120,7 @@ struct UploadSpotView: View {
                             .padding(.vertical, 12)
                             .background(AppTheme.cream)
                             .clipShape(Capsule())
+                            .disabled(isUploading || address.isEmpty)
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 24)
@@ -124,8 +131,22 @@ struct UploadSpotView: View {
                     .padding(.horizontal, 12)
                 }
             }
+
+            if isUploading {
+                Color.black.opacity(0.2).ignoresSafeArea()
+                ProgressView("Saving spot...")
+                    .tint(.white)
+                    .foregroundStyle(.white)
+            }
         }
         .presentationDetents([.large])
+        .alert("Upload Error", isPresented: uploadErrorBinding) {
+            Button("OK", role: .cancel) {
+                uploadErrorMessage = nil
+            }
+        } message: {
+            Text(uploadErrorMessage ?? "Unable to upload this spot.")
+        }
     }
 
     private var featureChecklist: some View {
@@ -162,10 +183,14 @@ struct UploadSpotView: View {
         .padding(.horizontal, 20)
     }
 
-    private func submitSpot() {
-        guard !address.isEmpty else { return }
-        let coordinate = locationManager.userLocation
+    /// Validates input and uploads the spot to Firestore for all users.
+    private func submitSpot() async {
+        guard !address.isEmpty, let userID = appState.currentUserID else { return }
 
+        isUploading = true
+        uploadErrorMessage = nil
+
+        let coordinate = locationManager.userLocation
         let spot = RestingSpot(
             id: UUID(),
             name: address.components(separatedBy: ",").first ?? "New Spot",
@@ -175,17 +200,37 @@ struct UploadSpotView: View {
             longitude: coordinate.longitude,
             features: Array(selectedFeatures),
             imageName: nil,
+            imageURL: nil,
             averageRating: 0,
-            reviewCount: 0
+            reviewCount: 0,
+            createdBy: userID
         )
 
-        spotService.addSpot(spot)
-        dismiss()
+        do {
+            try await spotService.uploadSpot(spot, imageData: selectedImageData, userID: userID)
+            dismiss()
+        } catch {
+            uploadErrorMessage = error.localizedDescription
+        }
+
+        isUploading = false
+    }
+
+    private var uploadErrorBinding: Binding<Bool> {
+        Binding(
+            get: { uploadErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    uploadErrorMessage = nil
+                }
+            }
+        )
     }
 }
 
 #Preview {
     UploadSpotView()
+        .environmentObject(AppState())
         .environmentObject(SpotDataService())
         .environmentObject(LocationManager())
 }

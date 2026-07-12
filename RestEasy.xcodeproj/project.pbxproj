@@ -28,6 +28,13 @@
 		A1000120 /* SeedSpots.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022 /* SeedSpots.swift */; };
 		A1000121 /* DirectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000023 /* DirectionsService.swift */; };
 		A1000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000018 /* Assets.xcassets */; };
+		A1000131 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A1000130 /* GoogleService-Info.plist */; };
+		A1000133 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000132 /* AuthService.swift */; };
+		A1000135 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000134 /* AppDelegate.swift */; };
+		A1000210 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A1000220 /* FirebaseAuth */; };
+		A1000211 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A1000221 /* FirebaseFirestore */; };
+		A1000212 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A1000222 /* FirebaseStorage */; };
+		A1000213 /* GoogleSignIn in Frameworks */ = {isa = PBXBuildFile; productRef = A1000223 /* GoogleSignIn */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -54,6 +61,10 @@
 		A1000021 /* MapSearchService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MapSearchService.swift; sourceTree = "<group>"; };
 		A1000022 /* SeedSpots.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SeedSpots.swift; sourceTree = "<group>"; };
 		A1000023 /* DirectionsService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectionsService.swift; sourceTree = "<group>"; };
+		A1000130 /* GoogleService-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = "GoogleService-Info.plist"; sourceTree = "<group>"; };
+		A1000132 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
+		A1000134 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		A1000136 /* RestEasy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RestEasy.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -61,6 +72,10 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				A1000210 /* FirebaseAuth in Frameworks */,
+				A1000211 /* FirebaseFirestore in Frameworks */,
+				A1000212 /* FirebaseStorage in Frameworks */,
+				A1000213 /* GoogleSignIn in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -86,6 +101,8 @@
 				A1000054 /* Utils */,
 				A1000055 /* Resources */,
 				A1000017 /* Info.plist */,
+				A1000130 /* GoogleService-Info.plist */,
+				A1000136 /* RestEasy.entitlements */,
 			);
 			path = RestEasy;
 			sourceTree = "<group>";
@@ -103,6 +120,7 @@
 			children = (
 				A1000001 /* RestEasyApp.swift */,
 				A1000002 /* AppState.swift */,
+				A1000134 /* AppDelegate.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -127,6 +145,7 @@
 		A1000052 /* Services */ = {
 			isa = PBXGroup;
 			children = (
+				A1000132 /* AuthService.swift */,
 				A1000006 /* LocationManager.swift */,
 				A1000007 /* SpotDataService.swift */,
 				A1000021 /* MapSearchService.swift */,
@@ -232,6 +251,12 @@
 			dependencies = (
 			);
 			name = RestEasy;
+			packageProductDependencies = (
+				A1000220 /* FirebaseAuth */,
+				A1000221 /* FirebaseFirestore */,
+				A1000222 /* FirebaseStorage */,
+				A1000223 /* GoogleSignIn */,
+			);
 			productName = RestEasy;
 			productReference = A1000020 /* RestEasy.app */;
 			productType = "com.apple.product-type.application";
@@ -260,6 +285,10 @@
 				Base,
 			);
 			mainGroup = A1000040;
+			packageReferences = (
+				A1000200 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
+				A1000201 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */,
+			);
 			productRefGroup = A1000042 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -275,6 +304,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				A1000117 /* Assets.xcassets in Resources */,
+				A1000131 /* GoogleService-Info.plist in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -305,6 +335,8 @@
 				A1000119 /* MapSearchService.swift in Sources */,
 				A1000120 /* SeedSpots.swift in Sources */,
 				A1000121 /* DirectionsService.swift in Sources */,
+				A1000133 /* AuthService.swift in Sources */,
+				A1000135 /* AppDelegate.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,6 +393,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = RestEasy/RestEasy.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
@@ -386,7 +419,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
-				CODE_SIGN_STYLE = Automatic;
+				CODE_SIGN_ENTITLEMENTS = RestEasy/RestEasy.entitlements;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = "";
 				GENERATE_INFOPLIST_FILE = NO;
@@ -428,6 +461,48 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		A1000200 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/firebase/firebase-ios-sdk";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 11.0.0;
+			};
+		};
+		A1000201 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/google/GoogleSignIn-iOS";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 8.0.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		A1000220 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000200 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
+		};
+		A1000221 /* FirebaseFirestore */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000200 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseFirestore;
+		};
+		A1000222 /* FirebaseStorage */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000200 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseStorage;
+		};
+		A1000223 /* GoogleSignIn */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = A1000201 /* XCRemoteSwiftPackageReference "GoogleSignIn-iOS" */;
+			productName = GoogleSignIn;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = A1000080 /* Project object */;
 }

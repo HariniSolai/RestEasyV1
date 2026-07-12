@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 
 /// Global application state for auth flow and user preferences.
@@ -6,27 +7,86 @@ final class AppState: ObservableObject {
     @Published var isAuthenticated = false
     @Published var hasCompletedTutorial = false
     @Published var userDisplayName = ""
+    @Published var authErrorMessage: String?
+    @Published var isAuthLoading = false
     @Published var textSizeScale: Double = 1.0
     @Published var isHighContrastEnabled = false
     @Published var mapZoomLevel: Double = AppConstants.defaultMapZoomLevel
 
-    /// Simulates a successful login for demo purposes.
-    func login(email: String, password: String) {
-        guard !email.isEmpty, !password.isEmpty else { return }
-        userDisplayName = email.components(separatedBy: "@").first?.capitalized ?? "User"
-        isAuthenticated = true
+    private let authService: AuthService
+    private var cancellables = Set<AnyCancellable>()
+
+    init() {
+        authService = AuthService()
+        bindAuthService()
     }
 
-    /// Simulates account creation for demo purposes.
-    func signUp(fullName: String, email: String, password: String) {
-        guard !fullName.isEmpty, !email.isEmpty, password.count >= 6 else { return }
-        userDisplayName = fullName
-        isAuthenticated = true
+    /// Firebase Auth UID for the signed-in user.
+    var currentUserID: String? {
+        authService.currentUserID
     }
 
+    /// Signs in with email and password.
+    /// - Parameters:
+    ///   - email: The user's email address.
+    ///   - password: The user's password.
+    func login(email: String, password: String) async {
+        await authService.signIn(email: email, password: password)
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Creates a new account with email and password.
+    /// - Parameters:
+    ///   - fullName: The display name shown in the app.
+    ///   - email: The user's email address.
+    ///   - password: The user's password.
+    func signUp(fullName: String, email: String, password: String) async {
+        await authService.signUp(fullName: fullName, email: email, password: password)
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Signs in with Google.
+    func signInWithGoogle() async {
+        await authService.signInWithGoogle()
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Signs in with Apple.
+    func signInWithApple() async {
+        await authService.signInWithApple()
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Sends a password reset email.
+    /// - Parameter email: The account email address.
+    func sendPasswordReset(email: String) async {
+        await authService.sendPasswordReset(email: email)
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Signs the current user out.
     func logout() {
-        isAuthenticated = false
+        authService.signOut()
         hasCompletedTutorial = false
-        userDisplayName = ""
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Mirrors auth state from `AuthService` into view-friendly published properties.
+    private func bindAuthService() {
+        authService.$isAuthenticated
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$isAuthenticated)
+
+        authService.$userDisplayName
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$userDisplayName)
+
+        authService.$isLoading
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$isAuthLoading)
+
+        authService.$errorMessage
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$authErrorMessage)
     }
 }

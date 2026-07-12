@@ -1,14 +1,29 @@
 import Foundation
 import CoreLocation
+import FirebaseFirestore
+import FirebaseStorage
 
-/// Provides resting spot data and CRUD operations (in-memory for demo).
+/// Provides resting spot data from seed content and shared Firestore uploads.
 @MainActor
 final class SpotDataService: ObservableObject {
     @Published private(set) var spots: [RestingSpot] = []
     @Published private(set) var reviews: [Review] = []
+    @Published private(set) var isLoadingSpots = false
+    @Published var errorMessage: String?
+
+    private let database = Firestore.firestore()
+    private let storage = Storage.storage()
+    private var listener: ListenerRegistration?
+    private var firestoreSpots: [RestingSpot] = []
 
     init() {
-        loadSampleData()
+        reviews = SeedSpots.reviews
+        spots = SeedSpots.spots
+        startListening()
+    }
+
+    deinit {
+        listener?.remove()
     }
 
     /// Returns nearby spots, optionally filtered by amenity tags and free-text query.
@@ -42,10 +57,26 @@ final class SpotDataService: ObservableObject {
             }
     }
 
-    /// Adds a newly uploaded resting spot, including any amenity tags the user selected.
-    /// - Parameter spot: The spot to append to the in-memory list.
-    func addSpot(_ spot: RestingSpot) {
-        spots.append(spot)
+    /// Uploads a new resting spot so every signed-in user can see it.
+    /// - Parameters:
+    ///   - spot: The spot metadata to save.
+    ///   - imageData: Optional JPEG/PNG data for the spot photo.
+    ///   - userID: Firebase Auth UID of the contributor.
+    func uploadSpot(_ spot: RestingSpot, imageData: Data?, userID: String) async throws {
+        var spotToUpload = spot
+        spotToUpload.createdBy = userID
+
+        if let imageData {
+            spotToUpload.imageURL = try await uploadImage(imageData, spotID: spot.id)
+        }
+
+        var documentData = spotToUpload.firestoreData
+        documentData["createdAt"] = FieldValue.serverTimestamp()
+
+        try await database
+            .collection("spots")
+            .document(spot.id.uuidString)
+            .setData(documentData)
     }
 
     /// Returns reviews for a specific spot.
@@ -53,6 +84,54 @@ final class SpotDataService: ObservableObject {
     /// - Returns: Reviews linked to that spot.
     func reviews(for spotID: UUID) -> [Review] {
         reviews.filter { $0.spotID == spotID }
+    }
+
+    /// Subscribes to shared Firestore spots and merges them with local seed data.
+    private func startListening() {
+        isLoadingSpots = true
+
+        listener = database.collection("spots").addSnapshotListener { [weak self] snapshot, error in
+            Task { @MainActor in
+                guard let self else { return }
+                self.isLoadingSpots = false
+
+                if let error {
+                    self.errorMessage = error.localizedDescription
+                    return
+                }
+
+                guard let documents = snapshot?.documents else { return }
+                self.firestoreSpots = documents.compactMap(RestingSpot.init(document:))
+                self.mergeSpots()
+            }
+        }
+    }
+
+    /// Combines bundled seed spots with user-uploaded Firestore spots.
+    private func mergeSpots() {
+        var mergedSpots = SeedSpots.spots
+        let seedIDs = Set(mergedSpots.map(\.id))
+
+        for spot in firestoreSpots where !seedIDs.contains(spot.id) {
+            mergedSpots.append(spot)
+        }
+
+        spots = mergedSpots
+    }
+
+    /// Uploads a spot photo to Firebase Storage.
+    /// - Parameters:
+    ///   - imageData: The image bytes selected by the user.
+    ///   - spotID: The resting spot identifier used in the storage path.
+    /// - Returns: A public download URL for the uploaded image.
+    private func uploadImage(_ imageData: Data, spotID: UUID) async throws -> String {
+        let imageReference = storage.reference().child("spots/\(spotID.uuidString)/photo.jpg")
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+
+        _ = try await imageReference.putDataAsync(imageData, metadata: metadata)
+        let downloadURL = try await imageReference.downloadURL()
+        return downloadURL.absoluteString
     }
 
     /// Returns whether a spot includes every selected amenity filter.
@@ -86,11 +165,5 @@ final class SpotDataService: ObservableObject {
         return spot.features.contains { feature in
             feature.matches(query: query)
         }
-    }
-
-    /// Loads hardcoded UIC / West Loop spots from `SeedSpots`.
-    private func loadSampleData() {
-        spots = SeedSpots.spots
-        reviews = SeedSpots.reviews
     }
 }

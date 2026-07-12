@@ -600,7 +600,28 @@ struct MapHomeView: View {
                 }
             }
 
-            if let imageName = spot.imageName, UIImage(named: imageName) != nil {
+            if let imageURL = spot.imageURL, let url = URL(string: imageURL) {
+                AsyncImage(url: url) { phase in
+                    switch phase {
+                    case .success(let image):
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    case .failure:
+                        Image(systemName: "photo")
+                            .font(.largeTitle)
+                            .foregroundStyle(.white.opacity(0.5))
+                    default:
+                        ProgressView()
+                            .tint(.white)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .accessibilityLabel("Photo of \(spot.name)")
+            } else if let imageName = spot.imageName, UIImage(named: imageName) != nil {
                 Image(imageName)
                     .resizable()
                     .scaledToFill()

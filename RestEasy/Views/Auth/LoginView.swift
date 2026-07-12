@@ -9,6 +9,7 @@ struct LoginView: View {
     @State private var password = ""
     @State private var isPasswordVisible = false
     @State private var showSignUp = false
+    @State private var showResetConfirmation = false
 
     var body: some View {
         ZStack {
@@ -37,7 +38,10 @@ struct LoginView: View {
 
                         HStack {
                             Button("forgot password?") {
-                                // Placeholder for password recovery flow
+                                Task {
+                                    await appState.sendPasswordReset(email: email)
+                                    showResetConfirmation = true
+                                }
                             }
                             .font(.caption)
                             .foregroundStyle(AppTheme.cream.opacity(0.7))
@@ -46,9 +50,12 @@ struct LoginView: View {
                     }
                     .padding(.horizontal, 24)
 
-                    PrimaryButton(title: "Log in") {
-                        appState.login(email: email, password: password)
+                    PrimaryButton(title: appState.isAuthLoading ? "Logging in..." : "Log in") {
+                        Task {
+                            await appState.login(email: email, password: password)
+                        }
                     }
+                    .disabled(appState.isAuthLoading || email.isEmpty || password.isEmpty)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
 
@@ -71,15 +78,24 @@ struct LoginView: View {
 
                     VStack(spacing: 12) {
                         SocialSignInButton(title: "Continue with Google", systemImage: "g.circle.fill") {
-                            appState.login(email: "demo@gmail.com", password: "demo")
+                            Task { await appState.signInWithGoogle() }
                         }
+                        .disabled(appState.isAuthLoading)
+
                         SocialSignInButton(title: "Continue with Apple", systemImage: "apple.logo") {
-                            appState.login(email: "demo@icloud.com", password: "demo")
+                            Task { await appState.signInWithApple() }
                         }
+                        .disabled(appState.isAuthLoading)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 40)
                 }
+            }
+
+            if appState.isAuthLoading {
+                Color.black.opacity(0.2).ignoresSafeArea()
+                ProgressView()
+                    .tint(.white)
             }
         }
         .fullScreenCover(isPresented: $showSignUp) {
@@ -88,6 +104,33 @@ struct LoginView: View {
         .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
             if isAuthenticated { dismiss() }
         }
+        .alert("Sign In Error", isPresented: authErrorBinding) {
+            Button("OK", role: .cancel) {
+                appState.authErrorMessage = nil
+            }
+        } message: {
+            Text(appState.authErrorMessage ?? "Unable to sign in.")
+        }
+        .alert("Password Reset", isPresented: $showResetConfirmation) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let error = appState.authErrorMessage {
+                Text(error)
+            } else {
+                Text("If an account exists for that email, a reset link has been sent.")
+            }
+        }
+    }
+
+    private var authErrorBinding: Binding<Bool> {
+        Binding(
+            get: { appState.authErrorMessage != nil && !showResetConfirmation },
+            set: { isPresented in
+                if !isPresented {
+                    appState.authErrorMessage = nil
+                }
+            }
+        )
     }
 }
 

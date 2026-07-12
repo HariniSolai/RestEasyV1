@@ -1,5 +1,6 @@
 import Foundation
 import CoreLocation
+import FirebaseFirestore
 import MapKit
 
 /// A user-contributed resting spot or restroom location.
@@ -12,8 +13,10 @@ struct RestingSpot: Identifiable, Codable, Hashable {
     var longitude: Double
     var features: [SpotFeature]
     var imageName: String?
+    var imageURL: String?
     var averageRating: Double
     var reviewCount: Int
+    var createdBy: String?
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -24,6 +27,67 @@ struct RestingSpot: Identifiable, Codable, Hashable {
         let item = MKMapItem(placemark: placemark)
         item.name = name
         return item
+    }
+}
+
+extension RestingSpot {
+    /// Builds a resting spot from a Firestore document.
+    /// - Parameter document: A document from the `spots` collection.
+    /// - Returns: A decoded spot, or `nil` when required fields are missing.
+    init?(document: QueryDocumentSnapshot) {
+        let data = document.data()
+        guard let idString = data["id"] as? String,
+              let id = UUID(uuidString: idString),
+              let name = data["name"] as? String,
+              let address = data["address"] as? String,
+              let latitude = data["latitude"] as? Double,
+              let longitude = data["longitude"] as? Double,
+              let featureValues = data["features"] as? [String] else {
+            return nil
+        }
+
+        let features = featureValues.compactMap(SpotFeature.init(rawValue:))
+        self.init(
+            id: id,
+            name: name,
+            address: address,
+            directions: data["directions"] as? String,
+            latitude: latitude,
+            longitude: longitude,
+            features: features,
+            imageName: nil,
+            imageURL: data["imageURL"] as? String,
+            averageRating: data["averageRating"] as? Double ?? 0,
+            reviewCount: data["reviewCount"] as? Int ?? 0,
+            createdBy: data["createdBy"] as? String
+        )
+    }
+
+    /// Serializes the spot for Firestore storage.
+    /// - Returns: A dictionary suitable for `setData`.
+    var firestoreData: [String: Any] {
+        var data: [String: Any] = [
+            "id": id.uuidString,
+            "name": name,
+            "address": address,
+            "latitude": latitude,
+            "longitude": longitude,
+            "features": features.map(\.rawValue),
+            "averageRating": averageRating,
+            "reviewCount": reviewCount
+        ]
+
+        if let directions {
+            data["directions"] = directions
+        }
+        if let imageURL {
+            data["imageURL"] = imageURL
+        }
+        if let createdBy {
+            data["createdBy"] = createdBy
+        }
+
+        return data
     }
 }
 

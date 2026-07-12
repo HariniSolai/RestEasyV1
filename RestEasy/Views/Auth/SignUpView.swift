@@ -48,11 +48,14 @@ struct SignUpView: View {
                     }
                     .padding(.horizontal, 24)
 
-                    PrimaryButton(title: "Sign up") {
-                        guard passwordsMatch else { return }
-                        appState.signUp(fullName: fullName, email: email, password: password)
+                    PrimaryButton(title: appState.isAuthLoading ? "Creating account..." : "Sign up") {
+                        guard passwordsMatch, password.count >= 6 else { return }
+                        Task {
+                            await appState.signUp(fullName: fullName, email: email, password: password)
+                        }
                     }
-                    .opacity(passwordsMatch ? 1 : 0.6)
+                    .opacity(canSubmit ? 1 : 0.6)
+                    .disabled(!canSubmit || appState.isAuthLoading)
                     .padding(.horizontal, 24)
                     .padding(.top, 8)
 
@@ -75,15 +78,24 @@ struct SignUpView: View {
 
                     VStack(spacing: 12) {
                         SocialSignInButton(title: "Continue with Google", systemImage: "g.circle.fill") {
-                            appState.signUp(fullName: "Google User", email: "demo@gmail.com", password: "demo123")
+                            Task { await appState.signInWithGoogle() }
                         }
+                        .disabled(appState.isAuthLoading)
+
                         SocialSignInButton(title: "Continue with Apple", systemImage: "apple.logo") {
-                            appState.signUp(fullName: "Apple User", email: "demo@icloud.com", password: "demo123")
+                            Task { await appState.signInWithApple() }
                         }
+                        .disabled(appState.isAuthLoading)
                     }
                     .padding(.horizontal, 24)
                     .padding(.bottom, 40)
                 }
+            }
+
+            if appState.isAuthLoading {
+                Color.black.opacity(0.2).ignoresSafeArea()
+                ProgressView()
+                    .tint(.white)
             }
         }
         .fullScreenCover(isPresented: $showLogin) {
@@ -92,6 +104,31 @@ struct SignUpView: View {
         .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
             if isAuthenticated { dismiss() }
         }
+        .alert("Sign Up Error", isPresented: authErrorBinding) {
+            Button("OK", role: .cancel) {
+                appState.authErrorMessage = nil
+            }
+        } message: {
+            Text(appState.authErrorMessage ?? "Unable to create an account.")
+        }
+    }
+
+    private var canSubmit: Bool {
+        passwordsMatch
+            && password.count >= 6
+            && !fullName.isEmpty
+            && !email.isEmpty
+    }
+
+    private var authErrorBinding: Binding<Bool> {
+        Binding(
+            get: { appState.authErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    appState.authErrorMessage = nil
+                }
+            }
+        )
     }
 }
 
