@@ -7,6 +7,8 @@ final class AppState: ObservableObject {
     @Published var isAuthenticated = false
     @Published var hasCompletedTutorial = false
     @Published var userDisplayName = ""
+    @Published var userEmail = ""
+    @Published var userPhotoURL: URL?
     @Published var authErrorMessage: String?
     @Published var isAuthLoading = false
     @Published var textSizeScale: Double = 1.0
@@ -71,6 +73,20 @@ final class AppState: ObservableObject {
         authErrorMessage = authService.errorMessage
     }
 
+    /// Updates the signed-in user's display name in Firebase Auth.
+    /// - Parameter newName: The name to show on Profile and in reviews.
+    func updateDisplayName(_ newName: String) async {
+        await authService.updateDisplayName(newName)
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Uploads a profile picture and links it to the Firebase Auth account.
+    /// - Parameter imageData: Image bytes selected from the photo library.
+    func updateProfilePhoto(imageData: Data) async {
+        await authService.updateProfilePhoto(imageData: imageData)
+        authErrorMessage = authService.errorMessage
+    }
+
     /// Mirrors auth state from `AuthService` into view-friendly published properties.
     private func bindAuthService() {
         authService.$isAuthenticated
@@ -80,6 +96,14 @@ final class AppState: ObservableObject {
         authService.$userDisplayName
             .receive(on: DispatchQueue.main)
             .assign(to: &$userDisplayName)
+
+        authService.$userEmail
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$userEmail)
+
+        authService.$userPhotoURL
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$userPhotoURL)
 
         authService.$isLoading
             .receive(on: DispatchQueue.main)

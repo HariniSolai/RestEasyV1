@@ -2,6 +2,7 @@ import AuthenticationServices
 import CryptoKit
 import FirebaseAuth
 import FirebaseCore
+import FirebaseStorage
 import GoogleSignIn
 import UIKit
 
@@ -10,10 +11,13 @@ import UIKit
 final class AuthService: ObservableObject {
     @Published private(set) var isAuthenticated = false
     @Published private(set) var userDisplayName = ""
+    @Published private(set) var userEmail = ""
+    @Published private(set) var userPhotoURL: URL?
     @Published private(set) var currentUserID: String?
     @Published var errorMessage: String?
     @Published var isLoading = false
 
+    private let storage = Storage.storage()
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     private var appleSignInCoordinator: AppleSignInCoordinator?
 
@@ -123,11 +127,73 @@ final class AuthService: ObservableObject {
         }
     }
 
+    /// Updates the signed-in user's Firebase display name.
+    /// - Parameter newName: The name to show on the profile and in reviews.
+    func updateDisplayName(_ newName: String) async {
+        let trimmedName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        await performAuthOperation {
+            guard let user = Auth.auth().currentUser else {
+                throw AuthServiceError.notSignedIn
+            }
+            guard !trimmedName.isEmpty else {
+                throw AuthServiceError.emptyDisplayName
+            }
+
+            let changeRequest = user.createProfileChangeRequest()
+            changeRequest.displayName = trimmedName
+            try await changeRequest.commitChanges()
+            self.updateSession(with: Auth.auth().currentUser)
+        }
+    }
+
+    /// Uploads a profile photo to Storage and saves its URL on the Firebase Auth profile.
+    /// - Parameter imageData: JPEG/PNG bytes selected by the user.
+    func updateProfilePhoto(imageData: Data) async {
+        await performAuthOperation {
+            guard let user = Auth.auth().currentUser else {
+                throw AuthServiceError.notSignedIn
+            }
+            guard let jpegData = Self.jpegData(from: imageData) else {
+                throw AuthServiceError.invalidProfileImage
+            }
+
+            let photoURL = try await self.uploadProfileImage(jpegData, userID: user.uid)
+            let changeRequest = user.createProfileChangeRequest()
+            changeRequest.photoURL = photoURL
+            try await changeRequest.commitChanges()
+            self.updateSession(with: Auth.auth().currentUser)
+        }
+    }
+
+    /// Compresses picker image data to JPEG for Storage uploads.
+    /// - Parameter imageData: Raw image bytes from the photo picker.
+    /// - Returns: JPEG data, or `nil` when the bytes cannot be decoded.
+    private static func jpegData(from imageData: Data) -> Data? {
+        guard let image = UIImage(data: imageData) else { return nil }
+        return image.jpegData(compressionQuality: 0.8)
+    }
+
+    /// Uploads profile image bytes and returns a download URL.
+    /// - Parameters:
+    ///   - imageData: JPEG bytes to upload.
+    ///   - userID: Firebase Auth UID used in the Storage path.
+    /// - Returns: A public download URL for the uploaded avatar.
+    private func uploadProfileImage(_ imageData: Data, userID: String) async throws -> URL {
+        let imageReference = storage.reference().child("profiles/\(userID)/avatar.jpg")
+        let metadata = StorageMetadata()
+        metadata.contentType = "image/jpeg"
+
+        _ = try await imageReference.putDataAsync(imageData, metadata: metadata)
+        return try await imageReference.downloadURL()
+    }
+
     /// Updates published auth state from the current Firebase user.
     /// - Parameter user: The signed-in Firebase user, if any.
     private func updateSession(with user: User?) {
         isAuthenticated = user != nil
         currentUserID = user?.uid
+        userEmail = user?.email ?? ""
+        userPhotoURL = user?.photoURL
         userDisplayName = user?.displayName
             ?? user?.email?.components(separatedBy: "@").first?.capitalized
             ?? ""
@@ -189,6 +255,9 @@ private enum AuthServiceError: LocalizedError {
     case missingPresentationContext
     case missingGoogleToken
     case missingAppleToken
+    case notSignedIn
+    case emptyDisplayName
+    case invalidProfileImage
 
     var errorDescription: String? {
         switch self {
@@ -200,6 +269,12 @@ private enum AuthServiceError: LocalizedError {
             return "Google did not return a valid sign-in token."
         case .missingAppleToken:
             return "Apple did not return a valid sign-in token."
+        case .notSignedIn:
+            return "You need to be signed in to update your profile."
+        case .emptyDisplayName:
+            return "Display name can’t be empty."
+        case .invalidProfileImage:
+            return "That image couldn’t be used. Try a different photo."
         }
     }
 }

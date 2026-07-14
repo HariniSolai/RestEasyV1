@@ -155,7 +155,8 @@ struct MapHomeView: View {
                     }
                 }
                 .padding(.trailing, 24)
-                .padding(.bottom, selectedSpot == nil || isNavigating || isLiveGuidance ? 32 : 16)
+                // Tab bar already claims bottom safe area; keep the FAB lightly inset above it.
+                .padding(.bottom, selectedSpot == nil || isNavigating || isLiveGuidance ? 16 : 8)
             }
         }
         .sheet(isPresented: $showUploadSheet) {
@@ -757,12 +758,6 @@ struct MapHomeView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Estimated time \(route.formattedETA), distance \(route.formattedDistance)")
 
-                if isUsingFallbackOrigin {
-                    Text("Showing Chicago as your location. On a real device with location allowed, RestEasy tracks where you are.")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-
                 Button {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isNavigating = true
@@ -1030,14 +1025,16 @@ struct MapHomeView: View {
         Button {
             handleUploadTap()
         } label: {
-            Image(systemName: "plus")
-                .font(.title2.bold())
-                .foregroundStyle(.black)
-                .frame(width: 56, height: 56)
-                .background(AppTheme.cream)
-                .clipShape(Circle())
+            Text("Add Spot")
+                .font(.headline.bold())
+                .foregroundStyle(AppTheme.cream)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(Color(red: 61 / 255, green: 95 / 255, blue: 61 / 255))
+                .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         }
+        .accessibilityLabel("Add Spot")
     }
 
     private func handleUploadTap() {
