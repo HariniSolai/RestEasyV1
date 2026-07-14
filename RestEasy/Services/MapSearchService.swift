@@ -1,3 +1,4 @@
+import Contacts
 import Foundation
 import MapKit
 import CoreLocation
@@ -45,6 +46,19 @@ final class MapSearchService: NSObject, ObservableObject {
     func clearCompletions() {
         completions = []
         searchError = nil
+    }
+
+    /// Resolves a map coordinate into a human-readable mailing address.
+    /// - Parameter coordinate: The latitude/longitude to reverse geocode.
+    /// - Returns: A formatted address string suitable for display in a text field.
+    func reverseGeocode(_ coordinate: CLLocationCoordinate2D) async throws -> String {
+        let geocoder = CLGeocoder()
+        let location = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let placemarks = try await geocoder.reverseGeocodeLocation(location)
+        guard let placemark = placemarks.first else {
+            return "Unknown location"
+        }
+        return formattedAddress(from: placemark)
     }
 
     /// Resolves an autocomplete suggestion to a map region near the preferred point.
@@ -211,6 +225,35 @@ final class MapSearchService: NSObject, ObservableObject {
             center: coordinate,
             span: MKCoordinateSpan(latitudeDelta: 0.08, longitudeDelta: 0.08)
         )
+    }
+
+    /// Formats a geocoded placemark into a single-line address.
+    /// - Parameter placemark: The reverse-geocoding result.
+    /// - Returns: A mailing-style address, or a fallback label when fields are missing.
+    private func formattedAddress(from placemark: CLPlacemark) -> String {
+        if let postalAddress = placemark.postalAddress {
+            return CNPostalAddressFormatter.string(from: postalAddress, style: .mailingAddress)
+                .replacingOccurrences(of: "\n", with: ", ")
+        }
+
+        var parts: [String] = []
+        if let subThoroughfare = placemark.subThoroughfare,
+           let thoroughfare = placemark.thoroughfare {
+            parts.append("\(subThoroughfare) \(thoroughfare)")
+        } else if let thoroughfare = placemark.thoroughfare {
+            parts.append(thoroughfare)
+        }
+        if let locality = placemark.locality {
+            parts.append(locality)
+        }
+        if let administrativeArea = placemark.administrativeArea {
+            parts.append(administrativeArea)
+        }
+        if let postalCode = placemark.postalCode {
+            parts.append(postalCode)
+        }
+
+        return parts.isEmpty ? "Unknown location" : parts.joined(separator: ", ")
     }
 }
 

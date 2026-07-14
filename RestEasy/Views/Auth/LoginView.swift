@@ -41,6 +41,9 @@ struct LoginView: View {
                         CreamTextField(placeholder: "Email address", text: $email)
                             .keyboardType(.emailAddress)
                             .textContentType(.emailAddress)
+                            .onChange(of: email) { _, _ in
+                                appState.authErrorMessage = nil
+                            }
 
                         CreamTextField(
                             placeholder: "Password",
@@ -49,6 +52,16 @@ struct LoginView: View {
                             isPasswordVisible: $isPasswordVisible
                         )
                         .textContentType(.password)
+                        .onChange(of: password) { _, _ in
+                            appState.authErrorMessage = nil
+                        }
+
+                        if let authError = appState.authErrorMessage, !showResetConfirmation {
+                            Text(authError)
+                                .font(.caption)
+                                .foregroundStyle(Color.red.opacity(0.9))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
 
                         HStack {
                             Button("forgot password?") {

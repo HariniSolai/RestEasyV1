@@ -9,6 +9,7 @@ struct UploadSpotView: View {
     @EnvironmentObject private var spotService: SpotDataService
     @EnvironmentObject private var locationManager: LocationManager
     @Environment(\.dismiss) private var dismiss
+    @StateObject private var mapSearchService = MapSearchService()
 
     @State private var address = ""
     @State private var directions = ""
@@ -17,6 +18,8 @@ struct UploadSpotView: View {
     @State private var selectedImage: Image?
     @State private var selectedImageData: Data?
     @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
+    @State private var droppedPinCoordinate = AppConstants.defaultMapCenter
+    @State private var isResolvingAddress = false
     @State private var isUploading = false
     @State private var uploadErrorMessage: String?
 
@@ -40,28 +43,46 @@ struct UploadSpotView: View {
                     .padding(.top, 16)
 
                     VStack(spacing: 16) {
-                        Map(position: $cameraPosition) {
-                            Annotation("You", coordinate: locationManager.userLocation) {
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.white)
-                                        .frame(width: 22, height: 22)
-                                    Circle()
-                                        .fill(AppTheme.accentBlue)
-                                        .frame(width: 14, height: 14)
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Tap the map to place the resting spot")
+                                .font(.caption)
+                                .foregroundStyle(.black.opacity(0.6))
+
+                            MapReader { proxy in
+                                Map(position: $cameraPosition) {
+                                    Annotation("Resting Spot", coordinate: droppedPinCoordinate) {
+                                        Image(systemName: "mappin.circle.fill")
+                                            .font(.title2)
+                                            .foregroundStyle(AppTheme.forestGreen)
+                                            .accessibilityLabel("Resting spot pin")
+                                    }
+
+                                    Annotation("You", coordinate: locationManager.userLocation) {
+                                        ZStack {
+                                            Circle()
+                                                .fill(Color.white)
+                                                .frame(width: 22, height: 22)
+                                            Circle()
+                                                .fill(AppTheme.accentBlue)
+                                                .frame(width: 14, height: 14)
+                                        }
+                                    }
+                                }
+                                .mapStyle(.standard)
+                                .onTapGesture { screenPoint in
+                                    guard let coordinate = proxy.convert(screenPoint, from: .local) else {
+                                        return
+                                    }
+                                    droppedPinCoordinate = coordinate
+                                    Task {
+                                        await updateAddress(for: coordinate)
+                                    }
                                 }
                             }
+                            .frame(height: 160)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
                         }
-                        .mapStyle(.standard)
-                        .frame(height: 160)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
                         .padding(.horizontal, 20)
-                        .onAppear {
-                            cameraPosition = .region(MKCoordinateRegion(
-                                center: locationManager.userLocation,
-                                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-                            ))
-                        }
 
                         PhotosPicker(selection: $selectedPhoto, matching: .images) {
                             VStack(spacing: 8) {
@@ -95,11 +116,19 @@ struct UploadSpotView: View {
                             }
                         }
 
-                        TextField("Enter address", text: $address)
-                            .padding()
-                            .background(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                            .padding(.horizontal, 20)
+                        HStack {
+                            TextField("Enter address", text: $address)
+                                .padding()
+                                .background(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                            if isResolvingAddress {
+                                ProgressView()
+                                    .tint(AppTheme.forestGreen)
+                                    .padding(.trailing, 8)
+                            }
+                        }
+                        .padding(.horizontal, 20)
 
                         TextField("Directions (optional)", text: $directions)
                             .padding()
@@ -120,7 +149,7 @@ struct UploadSpotView: View {
                             .padding(.vertical, 12)
                             .background(AppTheme.cream)
                             .clipShape(Capsule())
-                            .disabled(isUploading || address.isEmpty)
+                            .disabled(isUploading || isResolvingAddress || address.isEmpty)
                         }
                         .padding(.horizontal, 20)
                         .padding(.bottom, 24)
@@ -140,6 +169,16 @@ struct UploadSpotView: View {
             }
         }
         .presentationDetents([.large])
+        .onAppear {
+            droppedPinCoordinate = locationManager.userLocation
+            cameraPosition = .region(MKCoordinateRegion(
+                center: locationManager.userLocation,
+                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
+            ))
+            Task {
+                await updateAddress(for: droppedPinCoordinate)
+            }
+        }
         .alert("Upload Error", isPresented: uploadErrorBinding) {
             Button("OK", role: .cancel) {
                 uploadErrorMessage = nil
@@ -183,6 +222,19 @@ struct UploadSpotView: View {
         .padding(.horizontal, 20)
     }
 
+    /// Reverse-geocodes the dropped pin and updates the address field.
+    /// - Parameter coordinate: The map coordinate selected by the user.
+    private func updateAddress(for coordinate: CLLocationCoordinate2D) async {
+        isResolvingAddress = true
+        defer { isResolvingAddress = false }
+
+        do {
+            address = try await mapSearchService.reverseGeocode(coordinate)
+        } catch {
+            address = "Unknown location"
+        }
+    }
+
     /// Validates input and uploads the spot to Firestore for all users.
     private func submitSpot() async {
         guard !address.isEmpty, let userID = appState.currentUserID else { return }
@@ -190,14 +242,13 @@ struct UploadSpotView: View {
         isUploading = true
         uploadErrorMessage = nil
 
-        let coordinate = locationManager.userLocation
         let spot = RestingSpot(
             id: UUID(),
             name: address.components(separatedBy: ",").first ?? "New Spot",
             address: address,
             directions: directions.isEmpty ? nil : directions,
-            latitude: coordinate.latitude,
-            longitude: coordinate.longitude,
+            latitude: droppedPinCoordinate.latitude,
+            longitude: droppedPinCoordinate.longitude,
             features: Array(selectedFeatures),
             imageNames: [],
             imageURL: nil,
