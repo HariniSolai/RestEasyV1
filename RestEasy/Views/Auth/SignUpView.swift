@@ -23,10 +23,24 @@ struct SignUpView: View {
 
             ScrollView {
                 VStack(spacing: 20) {
+                    HStack {
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.bold())
+                                .foregroundStyle(AppTheme.cream)
+                        }
+                        .accessibilityLabel("Close sign up")
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+
                     Text("Sign Up")
                         .font(.largeTitle.bold())
                         .foregroundStyle(AppTheme.cream)
-                        .padding(.top, 60)
+                        .padding(.top, 20)
                         .padding(.bottom, 20)
 
                     VStack(spacing: 16) {

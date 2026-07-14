@@ -12,7 +12,8 @@ struct RestingSpot: Identifiable, Codable, Hashable {
     var latitude: Double
     var longitude: Double
     var features: [SpotFeature]
-    var imageName: String?
+    /// Asset catalog names for seed-spot photos (supports multiple).
+    var imageNames: [String]
     var imageURL: String?
     var averageRating: Double
     var reviewCount: Int
@@ -55,7 +56,7 @@ extension RestingSpot {
             latitude: latitude,
             longitude: longitude,
             features: features,
-            imageName: nil,
+            imageNames: [],
             imageURL: data["imageURL"] as? String,
             averageRating: data["averageRating"] as? Double ?? 0,
             reviewCount: data["reviewCount"] as? Int ?? 0,
@@ -106,7 +107,7 @@ enum SpotFeature: String, Codable, CaseIterable, Identifiable {
     /// SF Symbol used on filter chips and search suggestions.
     var systemImage: String {
         switch self {
-        case .bench: return "seat"
+        case .bench: return "chair.fill"
         case .park: return "leaf.fill"
         case .shadedLocation: return "cloud.sun.fill"
         case .restroom: return "toilet"

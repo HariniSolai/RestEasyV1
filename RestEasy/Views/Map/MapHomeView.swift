@@ -15,8 +15,10 @@ struct MapHomeView: View {
     @State private var selectedFeatureFilters: Set<SpotFeature> = []
     @State private var selectedSpot: RestingSpot?
     @State private var showUploadSheet = false
+    @State private var spotPendingReview: RestingSpot?
     @State private var showAuthSheet = false
     @State private var pendingUploadAfterAuth = false
+    @State private var pendingReviewAfterAuth = false
     @State private var showSettings = false
     @State private var showMapSizeSheet = false
     @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
@@ -159,9 +161,15 @@ struct MapHomeView: View {
         .sheet(isPresented: $showUploadSheet) {
             UploadSpotView()
         }
+        .sheet(item: $spotPendingReview, onDismiss: {
+            refreshSelectedSpotFromService()
+        }) { spot in
+            AddReviewView(spot: spot)
+        }
         .fullScreenCover(isPresented: $showAuthSheet, onDismiss: {
             if !appState.isAuthenticated {
                 pendingUploadAfterAuth = false
+                pendingReviewAfterAuth = false
             }
         }) {
             WelcomeView()
@@ -201,9 +209,15 @@ struct MapHomeView: View {
             }
         }
         .onChange(of: appState.isAuthenticated) { _, isAuthenticated in
-            guard isAuthenticated, pendingUploadAfterAuth else { return }
-            pendingUploadAfterAuth = false
-            showUploadSheet = true
+            guard isAuthenticated else { return }
+
+            if pendingUploadAfterAuth {
+                pendingUploadAfterAuth = false
+                showUploadSheet = true
+            } else if pendingReviewAfterAuth {
+                pendingReviewAfterAuth = false
+                spotPendingReview = selectedSpot
+            }
         }
         .onChange(of: selectedSpot) { _, spot in
             if spot == nil {
@@ -301,10 +315,11 @@ struct MapHomeView: View {
                         toggleFeatureFilter(feature)
                     } label: {
                         Label(feature.rawValue, systemImage: feature.systemImage)
-                            .font(.caption.weight(.semibold))
+                            // Preference Search button size — change font and padding here
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(isSelected ? AppTheme.forestGreen : .black.opacity(0.75))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                             .background(isSelected ? AppTheme.cream : AppTheme.cream.opacity(0.55))
                             .clipShape(Capsule())
                             .overlay(
@@ -321,10 +336,11 @@ struct MapHomeView: View {
                         clearFeatureFilters()
                     } label: {
                         Text("Clear")
-                            .font(.caption.weight(.semibold))
+                            // Clear chip size — keep in sync with the filter chips above
+                            .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.black.opacity(0.7))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 12)
                             .background(AppTheme.cream.opacity(0.4))
                             .clipShape(Capsule())
                     }
@@ -621,24 +637,19 @@ struct MapHomeView: View {
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .accessibilityLabel("Photo of \(spot.name)")
-            } else if let imageName = spot.imageName, UIImage(named: imageName) != nil {
-                Image(imageName)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 120)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .accessibilityLabel("Photo of \(spot.name)")
+            } else {
+                seedSpotPhotoGallery(for: spot)
             }
 
+            // Spot address text size — change `.body` here to adjust
             Text(spot.address)
-                .font(.subheadline)
+                .font(.body)
                 .foregroundStyle(.white.opacity(0.85))
 
+            // Spot directions text size — change `.subheadline` here to adjust
             if let directions = spot.directions {
                 Text(directions)
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
             }
 
@@ -671,6 +682,42 @@ struct MapHomeView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppTheme.sageGreen, lineWidth: 1)
         )
+    }
+
+    /// Swipeable gallery for asset-catalog photos listed on a seed spot.
+    /// - Parameter spot: The resting spot whose `imageNames` should be shown.
+    /// - Returns: A paging gallery, or an empty view when no assets are available.
+    @ViewBuilder
+    private func seedSpotPhotoGallery(for spot: RestingSpot) -> some View {
+        let availableImageNames = spot.imageNames.filter { UIImage(named: $0) != nil }
+
+        if availableImageNames.isEmpty {
+            EmptyView()
+        } else if availableImageNames.count == 1, let imageName = availableImageNames.first {
+            Image(imageName)
+                .resizable()
+                .scaledToFill()
+                .frame(maxWidth: .infinity)
+                .frame(height: 120)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .accessibilityLabel("Photo of \(spot.name)")
+        } else {
+            TabView {
+                ForEach(availableImageNames, id: \.self) { imageName in
+                    Image(imageName)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 120)
+                        .clipped()
+                        .accessibilityLabel("Photo of \(spot.name)")
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .tabViewStyle(.page(indexDisplayMode: .automatic))
+        }
     }
 
     /// Shows travel mode, ETA, and in-app navigation controls for a selected spot.
@@ -925,16 +972,33 @@ struct MapHomeView: View {
         let spotReviews = spotService.reviews(for: spot.id)
 
         return VStack(alignment: .leading, spacing: 8) {
-            Text("Reviews and Ratings")
-                .font(.headline)
-                .foregroundStyle(.white)
+            HStack {
+                Text("Reviews and Ratings")
+                    .font(.headline)
+                    .foregroundStyle(.white)
+
+                Spacer()
+
+                Button {
+                    handleAddReviewTap()
+                } label: {
+                    Label("Add", systemImage: "square.and.pencil")
+                        .font(.caption.bold())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(AppTheme.cream)
+                        .clipShape(Capsule())
+                }
+                .accessibilityLabel("Add a review")
+            }
 
             if spotReviews.isEmpty {
                 Text("No reviews yet. Be the first!")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.7))
             } else {
-                ForEach(spotReviews.prefix(2)) { review in
+                ForEach(spotReviews.prefix(5)) { review in
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text(review.authorName)
@@ -983,6 +1047,25 @@ struct MapHomeView: View {
             pendingUploadAfterAuth = true
             showAuthSheet = true
         }
+    }
+
+    /// Opens the add-review sheet, prompting login first when the user is a guest.
+    private func handleAddReviewTap() {
+        if appState.isAuthenticated {
+            spotPendingReview = selectedSpot
+        } else {
+            pendingReviewAfterAuth = true
+            showAuthSheet = true
+        }
+    }
+
+    /// Refreshes the selected spot so updated ratings appear after a new review.
+    private func refreshSelectedSpotFromService() {
+        guard let selectedID = selectedSpot?.id,
+              let updatedSpot = spotService.spots.first(where: { $0.id == selectedID }) else {
+            return
+        }
+        selectedSpot = updatedSpot
     }
 
     private func updateSearchRegion() {

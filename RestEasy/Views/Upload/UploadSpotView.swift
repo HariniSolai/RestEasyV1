@@ -199,7 +199,7 @@ struct UploadSpotView: View {
             latitude: coordinate.latitude,
             longitude: coordinate.longitude,
             features: Array(selectedFeatures),
-            imageName: nil,
+            imageNames: [],
             imageURL: nil,
             averageRating: 0,
             reviewCount: 0,

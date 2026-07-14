@@ -5,7 +5,7 @@ import Foundation
 /// ## How to add your own spot
 /// 1. Copy one of the `RestingSpot(...)` blocks below and paste it inside the `spots` array.
 /// 2. Fill in `name`, `address`, `directions`, coordinates, and `features`.
-/// 3. (Optional) Add a photo in Assets.xcassets, then set `imageName` to that asset's name.
+/// 3. (Optional) Add one or more photos in Assets.xcassets, then list their names in `imageNames`.
 /// 4. Build and run — the new pin appears on the map automatically.
 ///
 /// Tip: Find latitude/longitude by dropping a pin in Apple Maps, then choosing
@@ -31,7 +31,7 @@ enum SeedSpots {
     static var spots: [RestingSpot] {
         [
             // MARK: - Example: Mary Bartelme Park (West Loop)
-            // Photo: add `spot-mary-bartelme` to Assets.xcassets, or leave imageName nil.
+            // Multiple photos: list each Assets.xcassets image set name below.
             RestingSpot(
                 id: IDs.maryBartelmePark,
                 name: "Mary Bartelme Park",
@@ -40,7 +40,10 @@ enum SeedSpots {
                 latitude: 41.8796,
                 longitude: -87.6510,
                 features: [.bench, .park, .shadedLocation, .seating],
-                imageName: "spot-mary-bartelme",
+                imageNames: [
+                    "spot-mary-bartelme",
+                    "spot-mary-bartelme-2"
+                ],
                 averageRating: 4.6,
                 reviewCount: 9
             ),
@@ -54,7 +57,7 @@ enum SeedSpots {
                 latitude: 41.8719,
                 longitude: -87.6476,
                 features: [.bench, .shadedLocation, .seating, .accessible],
-                imageName: nil,
+                imageNames: [],
                 averageRating: 4.2,
                 reviewCount: 14
             ),
@@ -68,7 +71,7 @@ enum SeedSpots {
                 latitude: 41.8843,
                 longitude: -87.6650,
                 features: [.bench, .park, .shadedLocation, .waterFountain],
-                imageName: nil,
+                imageNames: [],
                 averageRating: 4.4,
                 reviewCount: 6
             ),
@@ -81,7 +84,7 @@ enum SeedSpots {
                 latitude: 41.874585,
                 longitude: -87.650228,
                 features: [.bench],
-                imageName: nil,
+                imageNames: ["arcImg1", "arcImg2", "arcImg3"],
                 averageRating: 0,
                 reviewCount: 0
             ),
@@ -92,8 +95,8 @@ enum SeedSpots {
                 directions: "Place to sit as you get on the bridge to the UIC-Blue line station",
                 latitude: 41.874693,
                 longitude: -87.649724,
-                features: [.bench, .shadedLocation, .accessible, .seating],
-                imageName: nil,
+                features: [.bench, .accessible, .seating],
+                imageNames: ["bridge1", "bridge2", "bridge3", "bridge4"],
                 averageRating: 0,
                 reviewCount: 0
             ),
@@ -104,8 +107,8 @@ enum SeedSpots {
                 directions: "Place to sit at right near the road next to the Student Residence and Commons",
                 latitude: 41.874282,
                 longitude: -87.649813,
-                features: [.bench, .shadedLocation, .accessible, .seating],
-                imageName: nil,
+                features: [.bench, .accessible, .seating],
+                imageNames: ["nearCross1", "nearCross2"],
                 averageRating: 0,
                 reviewCount: 0
             ),
@@ -116,21 +119,21 @@ enum SeedSpots {
                 directions: "On the side of the sidewalk/path surrounded by green area",
                 latitude: 41.873529,
                 longitude: -87.649874,
-                features: [.bench, .shadedLocation, .accessible, .seating],
-                imageName: nil,
+                features: [.bench, .accessible, .seating],
+                imageNames: ["UICCampus1"],
                 averageRating: 0,
                 reviewCount: 0
             ),
-            
+
             RestingSpot(
                 id: IDs.uicPathBench2,
                 name: "Bench",
                 address: "1007 W Harrison St, Chicago, IL 60607",
-                directions: "Near the dead end on the road, on the side of the sidewalk/path near the UIS Behavioral Sciences Building",
+                directions: "Near the dead end on the road, on the side of the sidewalk/path near the UIC Behavioral Sciences Building",
                 latitude: 41.873196,
                 longitude: -87.651953,
-                features: [.bench, .shadedLocation, .seating],
-                imageName: nil,
+                features: [.bench, .seating],
+                imageNames: ["Bsb1", "Bsb2", "Bsb3", "Bsb4"],
                 averageRating: 0,
                 reviewCount: 0
             ),
@@ -142,7 +145,7 @@ enum SeedSpots {
                 latitude: 41.872651,
                 longitude: -87.648080,
                 features: [.bench, .seating],
-                imageName: nil,
+                imageNames: ["UICSCE1", "UICSCE2", "UICSCE3", "UICSCE4"],
                 averageRating: 0,
                 reviewCount: 0
             ),
@@ -158,7 +161,10 @@ enum SeedSpots {
             //     latitude: 41.8700,
             //     longitude: -87.6500,
             //     features: [.bench, .park, .shadedLocation],
-            //     imageName: "your-asset-name",  // or nil if no photo yet
+            //     imageNames: [
+            //         "spot-my-bench-1",
+            //         "spot-my-bench-2"
+            //     ],  // or [] if no photos yet
             //     averageRating: 0,
             //     reviewCount: 0
             // ),

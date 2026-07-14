@@ -17,10 +17,24 @@ struct LoginView: View {
 
             ScrollView {
                 VStack(spacing: 20) {
+                    HStack {
+                        Spacer()
+                        Button {
+                            dismiss()
+                        } label: {
+                            Image(systemName: "xmark")
+                                .font(.title3.bold())
+                                .foregroundStyle(AppTheme.cream)
+                        }
+                        .accessibilityLabel("Close login")
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 16)
+
                     Text("Log In")
                         .font(.largeTitle.bold())
                         .foregroundStyle(.white)
-                        .padding(.top, 60)
+                        .padding(.top, 20)
                         .padding(.bottom, 20)
 
                     VStack(spacing: 16) {

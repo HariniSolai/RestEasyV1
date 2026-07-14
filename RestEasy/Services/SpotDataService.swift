@@ -81,9 +81,53 @@ final class SpotDataService: ObservableObject {
 
     /// Returns reviews for a specific spot.
     /// - Parameter spotID: The resting spot identifier.
-    /// - Returns: Reviews linked to that spot.
+    /// - Returns: Reviews linked to that spot, newest first.
     func reviews(for spotID: UUID) -> [Review] {
-        reviews.filter { $0.spotID == spotID }
+        reviews
+            .filter { $0.spotID == spotID }
+            .sorted { $0.createdAt > $1.createdAt }
+    }
+
+    /// Adds a user review and refreshes the spot's rating summary.
+    /// - Parameters:
+    ///   - spotID: The resting spot being reviewed.
+    ///   - authorName: Display name of the signed-in user.
+    ///   - rating: Star rating from 1 to 5.
+    ///   - comment: Optional written feedback.
+    /// - Returns: The newly created review.
+    @discardableResult
+    func addReview(
+        spotID: UUID,
+        authorName: String,
+        rating: Int,
+        comment: String
+    ) -> Review {
+        let clampedRating = min(5, max(1, rating))
+        let review = Review(
+            id: UUID(),
+            spotID: spotID,
+            authorName: authorName.isEmpty ? "RestEasy User" : authorName,
+            rating: clampedRating,
+            comment: comment.trimmingCharacters(in: .whitespacesAndNewlines),
+            createdAt: Date()
+        )
+
+        reviews.insert(review, at: 0)
+        updateSpotRatingSummary(for: spotID)
+        return review
+    }
+
+    /// Recalculates average rating and review count for a spot after a new review.
+    /// - Parameter spotID: The resting spot identifier to update.
+    private func updateSpotRatingSummary(for spotID: UUID) {
+        let spotReviews = reviews(for: spotID)
+        guard let spotIndex = spots.firstIndex(where: { $0.id == spotID }) else { return }
+
+        let totalRating = spotReviews.reduce(0) { $0 + $1.rating }
+        spots[spotIndex].reviewCount = spotReviews.count
+        spots[spotIndex].averageRating = spotReviews.isEmpty
+            ? 0
+            : Double(totalRating) / Double(spotReviews.count)
     }
 
     /// Subscribes to shared Firestore spots and merges them with local seed data.
@@ -109,11 +153,28 @@ final class SpotDataService: ObservableObject {
 
     /// Combines bundled seed spots with user-uploaded Firestore spots.
     private func mergeSpots() {
+        let previousRatings = Dictionary(
+            uniqueKeysWithValues: spots.map { ($0.id, ($0.averageRating, $0.reviewCount)) }
+        )
+
         var mergedSpots = SeedSpots.spots
         let seedIDs = Set(mergedSpots.map(\.id))
 
         for spot in firestoreSpots where !seedIDs.contains(spot.id) {
             mergedSpots.append(spot)
+        }
+
+        for index in mergedSpots.indices {
+            let spotID = mergedSpots[index].id
+            let spotReviews = reviews(for: spotID)
+            if !spotReviews.isEmpty {
+                let totalRating = spotReviews.reduce(0) { $0 + $1.rating }
+                mergedSpots[index].reviewCount = spotReviews.count
+                mergedSpots[index].averageRating = Double(totalRating) / Double(spotReviews.count)
+            } else if let previous = previousRatings[spotID] {
+                mergedSpots[index].averageRating = previous.0
+                mergedSpots[index].reviewCount = previous.1
+            }
         }
 
         spots = mergedSpots

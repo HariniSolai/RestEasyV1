@@ -31,6 +31,7 @@
 		A1000131 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A1000130 /* GoogleService-Info.plist */; };
 		A1000133 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000132 /* AuthService.swift */; };
 		A1000135 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000134 /* AppDelegate.swift */; };
+		A1000137 /* AddReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000138 /* AddReviewView.swift */; };
 		A1000210 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A1000220 /* FirebaseAuth */; };
 		A1000211 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A1000221 /* FirebaseFirestore */; };
 		A1000212 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A1000222 /* FirebaseStorage */; };
@@ -65,6 +66,7 @@
 		A1000132 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		A1000134 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1000136 /* RestEasy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RestEasy.entitlements; sourceTree = "<group>"; };
+		A1000138 /* AddReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReviewView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -161,6 +163,7 @@
 				A1000061 /* Onboarding */,
 				A1000062 /* Map */,
 				A1000063 /* Upload */,
+				A1000066 /* Review */,
 				A1000064 /* Settings */,
 				A1000065 /* Components */,
 			);
@@ -217,6 +220,14 @@
 				A1000015 /* UploadSpotView.swift */,
 			);
 			path = Upload;
+			sourceTree = "<group>";
+		};
+		A1000066 /* Review */ = {
+			isa = PBXGroup;
+			children = (
+				A1000138 /* AddReviewView.swift */,
+			);
+			path = Review;
 			sourceTree = "<group>";
 		};
 		A1000064 /* Settings */ = {
@@ -337,6 +348,7 @@
 				A1000121 /* DirectionsService.swift in Sources */,
 				A1000133 /* AuthService.swift in Sources */,
 				A1000135 /* AppDelegate.swift in Sources */,
+				A1000137 /* AddReviewView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
