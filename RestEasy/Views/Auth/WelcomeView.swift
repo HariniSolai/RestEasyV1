@@ -30,16 +30,11 @@ struct WelcomeView: View {
                 Spacer()
 
                 VStack(spacing: 16) {
-                    Image(systemName: "leaf.fill")
-                        .font(.system(size: 48))
-                        .foregroundStyle(AppTheme.primaryButton)
-                        .overlay(alignment: .bottom) {
-                            Image(systemName: "chair.lounge.fill")
-                                .font(.system(size: 32))
-                                .foregroundStyle(AppTheme.cream)
-                                .offset(y: 20)
-                        }
-                        .padding(.bottom, 24)
+                    Image("RestEasyLogo")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 140, height: 140)
+                        .accessibilityLabel("RestEasy logo")
 
                     Text("Welcome to RestEasy")
                         .font(.largeTitle.bold())
