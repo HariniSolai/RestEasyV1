@@ -7,6 +7,8 @@ final class AppState: ObservableObject {
     @Published var isAuthenticated = false
     @Published var hasCompletedTutorial = false
     @Published var userDisplayName = ""
+    @Published var userEmail = ""
+    @Published var userPhotoURL: URL?
     @Published var authErrorMessage: String?
     @Published var isAuthLoading = false
     @Published var textSizeScale: Double = 1.0
@@ -64,6 +66,20 @@ final class AppState: ObservableObject {
         authErrorMessage = authService.errorMessage
     }
 
+    /// Updates the signed-in user's display name.
+    /// - Parameter displayName: The new name shown on profile and reviews.
+    func updateDisplayName(_ displayName: String) async {
+        await authService.updateDisplayName(displayName)
+        authErrorMessage = authService.errorMessage
+    }
+
+    /// Uploads a new profile photo for the signed-in user.
+    /// - Parameter imageData: Raw image bytes from the photo picker.
+    func updateProfilePhoto(imageData: Data) async {
+        await authService.updateProfilePhoto(imageData: imageData)
+        authErrorMessage = authService.errorMessage
+    }
+
     /// Signs the current user out.
     func logout() {
         authService.signOut()
@@ -80,6 +96,14 @@ final class AppState: ObservableObject {
         authService.$userDisplayName
             .receive(on: DispatchQueue.main)
             .assign(to: &$userDisplayName)
+
+        authService.$userEmail
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$userEmail)
+
+        authService.$userPhotoURL
+            .receive(on: DispatchQueue.main)
+            .assign(to: &$userPhotoURL)
 
         authService.$isLoading
             .receive(on: DispatchQueue.main)

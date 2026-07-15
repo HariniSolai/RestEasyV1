@@ -2,6 +2,7 @@ import AuthenticationServices
 import CryptoKit
 import FirebaseAuth
 import FirebaseCore
+import FirebaseStorage
 import GoogleSignIn
 import UIKit
 
@@ -10,10 +11,13 @@ import UIKit
 final class AuthService: ObservableObject {
     @Published private(set) var isAuthenticated = false
     @Published private(set) var userDisplayName = ""
+    @Published private(set) var userEmail = ""
+    @Published private(set) var userPhotoURL: URL?
     @Published private(set) var currentUserID: String?
     @Published var errorMessage: String?
     @Published var isLoading = false
 
+    private let storage = Storage.storage(url: "gs://resteasy-be034.firebasestorage.app")
     private var authStateHandle: AuthStateDidChangeListenerHandle?
     private var appleSignInCoordinator: AppleSignInCoordinator?
 
@@ -123,11 +127,59 @@ final class AuthService: ObservableObject {
         }
     }
 
+    /// Updates the signed-in user's display name in Firebase Auth.
+    /// - Parameter displayName: The new name shown on profile and reviews.
+    func updateDisplayName(_ displayName: String) async {
+        let trimmedName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            errorMessage = "Display name can’t be empty."
+            return
+        }
+
+        await performAuthOperation {
+            guard let user = Auth.auth().currentUser else {
+                throw AuthServiceError.notSignedIn
+            }
+
+            let changeRequest = user.createProfileChangeRequest()
+            changeRequest.displayName = trimmedName
+            try await changeRequest.commitChanges()
+            self.updateSession(with: Auth.auth().currentUser)
+        }
+    }
+
+    /// Uploads a profile photo to Storage and updates the Firebase Auth photo URL.
+    /// - Parameter imageData: Raw image bytes from the photo picker.
+    func updateProfilePhoto(imageData: Data) async {
+        await performAuthOperation {
+            guard let user = Auth.auth().currentUser else {
+                throw AuthServiceError.notSignedIn
+            }
+            guard let jpegData = ImageUploadHelper.jpegData(from: imageData) else {
+                throw AuthServiceError.invalidProfileImage
+            }
+
+            let imageReference = self.storage.reference().child("profiles/\(user.uid)/avatar.jpg")
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+
+            _ = try await imageReference.putDataAsync(jpegData, metadata: metadata)
+            let downloadURL = try await imageReference.downloadURL()
+
+            let changeRequest = user.createProfileChangeRequest()
+            changeRequest.photoURL = downloadURL
+            try await changeRequest.commitChanges()
+            self.updateSession(with: Auth.auth().currentUser)
+        }
+    }
+
     /// Updates published auth state from the current Firebase user.
     /// - Parameter user: The signed-in Firebase user, if any.
     private func updateSession(with user: User?) {
         isAuthenticated = user != nil
         currentUserID = user?.uid
+        userEmail = user?.email ?? ""
+        userPhotoURL = user?.photoURL
         userDisplayName = user?.displayName
             ?? user?.email?.components(separatedBy: "@").first?.capitalized
             ?? ""
@@ -213,6 +265,8 @@ private enum AuthServiceError: LocalizedError {
     case missingPresentationContext
     case missingGoogleToken
     case missingAppleToken
+    case notSignedIn
+    case invalidProfileImage
 
     var errorDescription: String? {
         switch self {
@@ -224,6 +278,10 @@ private enum AuthServiceError: LocalizedError {
             return "Google did not return a valid sign-in token."
         case .missingAppleToken:
             return "Apple did not return a valid sign-in token."
+        case .notSignedIn:
+            return "Sign in to update your profile."
+        case .invalidProfileImage:
+            return "That image couldn’t be prepared for upload. Try a different photo."
         }
     }
 }

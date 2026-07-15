@@ -128,7 +128,8 @@ struct MapHomeView: View {
 
                 mapSection
                     .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
 
                 if let spot = selectedSpot {
                     if isLiveGuidance {
@@ -143,7 +144,8 @@ struct MapHomeView: View {
                     }
                 }
 
-                Spacer(minLength: 0)
+                // Leaves a clear band above the root tab bar so the map is cropped short.
+                Spacer(minLength: 12)
             }
 
             VStack {
@@ -155,7 +157,7 @@ struct MapHomeView: View {
                     }
                 }
                 .padding(.trailing, 24)
-                .padding(.bottom, selectedSpot == nil || isNavigating || isLiveGuidance ? 32 : 16)
+                .padding(.bottom, selectedSpot == nil || isNavigating || isLiveGuidance ? 24 : 16)
             }
         }
         .sheet(isPresented: $showUploadSheet) {
@@ -789,12 +791,6 @@ struct MapHomeView: View {
                 .accessibilityElement(children: .combine)
                 .accessibilityLabel("Estimated time \(route.formattedETA), distance \(route.formattedDistance)")
 
-                if isUsingFallbackOrigin {
-                    Text("Showing Chicago as your location. On a real device with location allowed, RestEasy tracks where you are.")
-                        .font(.caption2)
-                        .foregroundStyle(.white.opacity(0.7))
-                }
-
                 Button {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         isNavigating = true
@@ -1062,14 +1058,16 @@ struct MapHomeView: View {
         Button {
             handleUploadTap()
         } label: {
-            Image(systemName: "plus")
-                .font(.title2.bold())
-                .foregroundStyle(.black)
-                .frame(width: 56, height: 56)
-                .background(AppTheme.cream)
-                .clipShape(Circle())
+            Text("Add Spot")
+                .font(.headline.bold())
+                .foregroundStyle(AppTheme.cream)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 14)
+                .background(Color(red: 61 / 255, green: 95 / 255, blue: 61 / 255))
+                .clipShape(Capsule())
                 .shadow(color: .black.opacity(0.2), radius: 4, y: 2)
         }
+        .accessibilityLabel("Add Spot")
     }
 
     private func handleUploadTap() {
