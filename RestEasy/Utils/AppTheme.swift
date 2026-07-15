@@ -9,4 +9,6 @@ enum AppTheme {
     static let cream = Color(red: 0.95, green: 0.94, blue: 0.89)
     static let linkGreen = Color(red: 0.35, green: 0.56, blue: 0.36)
     static let accentBlue = Color(red: 0.35, green: 0.65, blue: 1.0)
+    static let inputText = Color.black
+    static let inputPlaceholder = Color.black.opacity(0.45)
 }

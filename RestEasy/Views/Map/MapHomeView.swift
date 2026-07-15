@@ -271,10 +271,11 @@ struct MapHomeView: View {
     private var searchBar: some View {
         HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.black.opacity(0.6))
+                .foregroundStyle(AppTheme.inputPlaceholder)
 
-            TextField("Search area, bench, restroom…", text: $searchText)
-                .foregroundStyle(.black)
+            TextField("", text: $searchText, prompt: Text("Search area, bench, restroom…")
+                .foregroundStyle(AppTheme.inputPlaceholder))
+                .foregroundStyle(AppTheme.inputText)
                 .focused($isSearchFieldFocused)
                 .submitLabel(.search)
                 .onSubmit {
@@ -283,13 +284,13 @@ struct MapHomeView: View {
 
             if isSearchingArea {
                 ProgressView()
-                    .tint(.black.opacity(0.6))
+                    .tint(AppTheme.inputPlaceholder)
             } else if !searchText.isEmpty {
                 Button {
                     searchText = ""
                 } label: {
                     Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.black.opacity(0.45))
+                        .foregroundStyle(AppTheme.inputPlaceholder)
                 }
             }
 
@@ -298,13 +299,14 @@ struct MapHomeView: View {
                 showSettings = true
             } label: {
                 Image(systemName: "gearshape.fill")
-                    .foregroundStyle(.black.opacity(0.6))
+                    .foregroundStyle(AppTheme.inputPlaceholder)
             }
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
         .background(AppTheme.cream)
         .clipShape(Capsule())
+        .colorScheme(.light)
     }
 
     /// Horizontal amenity chips so users can filter spots by tagged needs.

@@ -20,9 +20,25 @@ struct UploadSpotView: View {
     private let maxPhotoCount = 5
     @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
     @State private var droppedPinCoordinate = AppConstants.defaultMapCenter
+    @State private var mapZoomLevel = AppConstants.defaultMapZoomLevel
     @State private var isResolvingAddress = false
     @State private var isUploading = false
     @State private var uploadErrorMessage: String?
+
+    private let zoomStep = 0.1
+
+    private var mapSpan: MKCoordinateSpan {
+        let delta = AppConstants.mapSpanDelta(for: mapZoomLevel)
+        return MKCoordinateSpan(latitudeDelta: delta, longitudeDelta: delta)
+    }
+
+    private var canZoomIn: Bool {
+        mapZoomLevel < AppConstants.mapZoomRange.upperBound
+    }
+
+    private var canZoomOut: Bool {
+        mapZoomLevel > AppConstants.mapZoomRange.lowerBound
+    }
 
     var body: some View {
         ZStack {
@@ -49,36 +65,41 @@ struct UploadSpotView: View {
                                 .font(.caption)
                                 .foregroundStyle(.black.opacity(0.6))
 
-                            MapReader { proxy in
-                                Map(position: $cameraPosition) {
-                                    Annotation("Resting Spot", coordinate: droppedPinCoordinate) {
-                                        Image(systemName: "mappin.circle.fill")
-                                            .font(.title2)
-                                            .foregroundStyle(AppTheme.forestGreen)
-                                            .accessibilityLabel("Resting spot pin")
-                                    }
+                            ZStack(alignment: .topTrailing) {
+                                MapReader { proxy in
+                                    Map(position: $cameraPosition) {
+                                        Annotation("Resting Spot", coordinate: droppedPinCoordinate) {
+                                            Image(systemName: "mappin.circle.fill")
+                                                .font(.title2)
+                                                .foregroundStyle(AppTheme.forestGreen)
+                                                .accessibilityLabel("Resting spot pin")
+                                        }
 
-                                    Annotation("You", coordinate: locationManager.userLocation) {
-                                        ZStack {
-                                            Circle()
-                                                .fill(Color.white)
-                                                .frame(width: 22, height: 22)
-                                            Circle()
-                                                .fill(AppTheme.accentBlue)
-                                                .frame(width: 14, height: 14)
+                                        Annotation("You", coordinate: locationManager.userLocation) {
+                                            ZStack {
+                                                Circle()
+                                                    .fill(Color.white)
+                                                    .frame(width: 22, height: 22)
+                                                Circle()
+                                                    .fill(AppTheme.accentBlue)
+                                                    .frame(width: 14, height: 14)
+                                            }
+                                        }
+                                    }
+                                    .mapStyle(.standard)
+                                    .onTapGesture { screenPoint in
+                                        guard let coordinate = proxy.convert(screenPoint, from: .local) else {
+                                            return
+                                        }
+                                        droppedPinCoordinate = coordinate
+                                        Task {
+                                            await updateAddress(for: coordinate)
                                         }
                                     }
                                 }
-                                .mapStyle(.standard)
-                                .onTapGesture { screenPoint in
-                                    guard let coordinate = proxy.convert(screenPoint, from: .local) else {
-                                        return
-                                    }
-                                    droppedPinCoordinate = coordinate
-                                    Task {
-                                        await updateAddress(for: coordinate)
-                                    }
-                                }
+
+                                zoomControls
+                                    .padding(8)
                             }
                             .frame(height: 160)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
@@ -130,10 +151,13 @@ struct UploadSpotView: View {
                         }
 
                         HStack {
-                            TextField("Enter address", text: $address)
+                            TextField("", text: $address, prompt: Text("Enter address")
+                                .foregroundStyle(AppTheme.inputPlaceholder))
+                                .foregroundStyle(AppTheme.inputText)
                                 .padding()
                                 .background(.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 8))
+                                .colorScheme(.light)
 
                             if isResolvingAddress {
                                 ProgressView()
@@ -143,10 +167,13 @@ struct UploadSpotView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        TextField("Directions (optional)", text: $directions)
+                        TextField("", text: $directions, prompt: Text("Directions (optional)")
+                            .foregroundStyle(AppTheme.inputPlaceholder))
+                            .foregroundStyle(AppTheme.inputText)
                             .padding()
                             .background(.white)
                             .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .colorScheme(.light)
                             .padding(.horizontal, 20)
 
                         featureChecklist
@@ -184,10 +211,7 @@ struct UploadSpotView: View {
         .presentationDetents([.large])
         .onAppear {
             droppedPinCoordinate = locationManager.userLocation
-            cameraPosition = .region(MKCoordinateRegion(
-                center: locationManager.userLocation,
-                span: MKCoordinateSpan(latitudeDelta: 0.05, longitudeDelta: 0.05)
-            ))
+            updateCamera()
             Task {
                 await updateAddress(for: droppedPinCoordinate)
             }
@@ -314,6 +338,65 @@ struct UploadSpotView: View {
                 }
             }
         )
+    }
+
+    private var zoomControls: some View {
+        VStack(spacing: 8) {
+            zoomButton(
+                systemName: "plus",
+                accessibilityLabel: "Zoom in",
+                isEnabled: canZoomIn
+            ) {
+                adjustZoom(by: zoomStep)
+            }
+
+            zoomButton(
+                systemName: "minus",
+                accessibilityLabel: "Zoom out",
+                isEnabled: canZoomOut
+            ) {
+                adjustZoom(by: -zoomStep)
+            }
+        }
+    }
+
+    private func zoomButton(
+        systemName: String,
+        accessibilityLabel: String,
+        isEnabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemName)
+                .font(.body.bold())
+                .foregroundStyle(isEnabled ? .black : .black.opacity(0.35))
+                .frame(width: 40, height: 40)
+                .background(AppTheme.cream)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .shadow(color: .black.opacity(0.15), radius: 2, y: 1)
+        }
+        .disabled(!isEnabled)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    /// Recenters the upload map on the dropped pin at the current zoom level.
+    private func updateCamera() {
+        cameraPosition = .region(MKCoordinateRegion(
+            center: droppedPinCoordinate,
+            span: mapSpan
+        ))
+    }
+
+    /// Adjusts the upload map zoom level and recenters on the dropped pin.
+    /// - Parameter delta: Positive values zoom in; negative values zoom out.
+    private func adjustZoom(by delta: Double) {
+        let newLevel = min(
+            AppConstants.mapZoomRange.upperBound,
+            max(AppConstants.mapZoomRange.lowerBound, mapZoomLevel + delta)
+        )
+        guard newLevel != mapZoomLevel else { return }
+        mapZoomLevel = newLevel
+        updateCamera()
     }
 }
 

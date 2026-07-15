@@ -3,9 +3,9 @@
 <plist version="1.0">
 <dict>
 	<key>CLIENT_ID</key>
-	<string>321855452582-oog3p1mlrcu2c3h6khth660alutqhepj.apps.googleusercontent.com</string>
+	<string>321855452582-ekj5p5986ogi64kgikuc8j3gbrfvanfj.apps.googleusercontent.com</string>
 	<key>REVERSED_CLIENT_ID</key>
-	<string>com.googleusercontent.apps.321855452582-oog3p1mlrcu2c3h6khth660alutqhepj</string>
+	<string>com.googleusercontent.apps.321855452582-ekj5p5986ogi64kgikuc8j3gbrfvanfj</string>
 	<key>API_KEY</key>
 	<string>AIzaSyDgYR5PIx_1EYk3JEbbQJCZOidX-GOO4lw</string>
 	<key>GCM_SENDER_ID</key>
@@ -13,7 +13,7 @@
 	<key>PLIST_VERSION</key>
 	<string>1</string>
 	<key>BUNDLE_ID</key>
-	<string>com.resteasy.app</string>
+	<string>com.ecc.resteasy</string>
 	<key>PROJECT_ID</key>
 	<string>resteasy-be034</string>
 	<key>STORAGE_BUCKET</key>
@@ -29,6 +29,6 @@
 	<key>IS_SIGNIN_ENABLED</key>
 	<true></true>
 	<key>GOOGLE_APP_ID</key>
-	<string>1:321855452582:ios:331d66852ff3afb6330b67</string>
+	<string>1:321855452582:ios:b805d3ded056fdf9330b67</string>
 </dict>
 </plist>

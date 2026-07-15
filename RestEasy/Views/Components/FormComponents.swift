@@ -28,6 +28,7 @@ struct CreamTextField: View {
                     TextField(placeholder, text: $text)
                 }
             }
+            .foregroundStyle(AppTheme.inputText)
             .textInputAutocapitalization(isSecure ? .never : .words)
             .autocorrectionDisabled(isSecure)
 
@@ -36,13 +37,14 @@ struct CreamTextField: View {
                     isPasswordVisible.toggle()
                 } label: {
                     Image(systemName: isPasswordVisible ? "eye.slash" : "eye")
-                        .foregroundStyle(.black.opacity(0.6))
+                        .foregroundStyle(AppTheme.inputPlaceholder)
                 }
             }
         }
         .padding()
         .background(AppTheme.cream)
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .colorScheme(.light)
     }
 }
 
@@ -83,6 +85,7 @@ struct SocialSignInButton: View {
             .padding()
             .background(AppTheme.cream)
             .clipShape(RoundedRectangle(cornerRadius: 8))
+            .colorScheme(.light)
         }
     }
 }
