@@ -23,15 +23,16 @@
 		A1000114 /* MapSizeSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000014 /* MapSizeSheet.swift */; };
 		A1000115 /* UploadSpotView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000015 /* UploadSpotView.swift */; };
 		A1000116 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000016 /* SettingsView.swift */; };
+		A1000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000018 /* Assets.xcassets */; };
 		A1000118 /* AppConstants.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000019 /* AppConstants.swift */; };
 		A1000119 /* MapSearchService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000021 /* MapSearchService.swift */; };
 		A1000120 /* SeedSpots.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000022 /* SeedSpots.swift */; };
 		A1000121 /* DirectionsService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000023 /* DirectionsService.swift */; };
-		A1000117 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A1000018 /* Assets.xcassets */; };
 		A1000131 /* GoogleService-Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = A1000130 /* GoogleService-Info.plist */; };
 		A1000133 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000132 /* AuthService.swift */; };
 		A1000135 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000134 /* AppDelegate.swift */; };
 		A1000137 /* AddReviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000138 /* AddReviewView.swift */; };
+		A1000141 /* ImageUploadHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1000140 /* ImageUploadHelper.swift */; };
 		A1000210 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = A1000220 /* FirebaseAuth */; };
 		A1000211 /* FirebaseFirestore in Frameworks */ = {isa = PBXBuildFile; productRef = A1000221 /* FirebaseFirestore */; };
 		A1000212 /* FirebaseStorage in Frameworks */ = {isa = PBXBuildFile; productRef = A1000222 /* FirebaseStorage */; };
@@ -67,6 +68,7 @@
 		A1000134 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		A1000136 /* RestEasy.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = RestEasy.entitlements; sourceTree = "<group>"; };
 		A1000138 /* AddReviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddReviewView.swift; sourceTree = "<group>"; };
+		A1000140 /* ImageUploadHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageUploadHelper.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -136,14 +138,6 @@
 			path = Models;
 			sourceTree = "<group>";
 		};
-		A1000056 /* Data */ = {
-			isa = PBXGroup;
-			children = (
-				A1000022 /* SeedSpots.swift */,
-			);
-			path = Data;
-			sourceTree = "<group>";
-		};
 		A1000052 /* Services */ = {
 			isa = PBXGroup;
 			children = (
@@ -175,6 +169,7 @@
 			children = (
 				A1000003 /* AppTheme.swift */,
 				A1000019 /* AppConstants.swift */,
+				A1000140 /* ImageUploadHelper.swift */,
 			);
 			path = Utils;
 			sourceTree = "<group>";
@@ -185,6 +180,14 @@
 				A1000018 /* Assets.xcassets */,
 			);
 			path = Resources;
+			sourceTree = "<group>";
+		};
+		A1000056 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				A1000022 /* SeedSpots.swift */,
+			);
+			path = Data;
 			sourceTree = "<group>";
 		};
 		A1000060 /* Auth */ = {
@@ -222,14 +225,6 @@
 			path = Upload;
 			sourceTree = "<group>";
 		};
-		A1000066 /* Review */ = {
-			isa = PBXGroup;
-			children = (
-				A1000138 /* AddReviewView.swift */,
-			);
-			path = Review;
-			sourceTree = "<group>";
-		};
 		A1000064 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
@@ -244,6 +239,14 @@
 				A1000008 /* FormComponents.swift */,
 			);
 			path = Components;
+			sourceTree = "<group>";
+		};
+		A1000066 /* Review */ = {
+			isa = PBXGroup;
+			children = (
+				A1000138 /* AddReviewView.swift */,
+			);
+			path = Review;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -349,6 +352,7 @@
 				A1000133 /* AuthService.swift in Sources */,
 				A1000135 /* AppDelegate.swift in Sources */,
 				A1000137 /* AddReviewView.swift in Sources */,
+				A1000141 /* ImageUploadHelper.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -372,7 +376,7 @@
 					"DEBUG=1",
 					"$(inherited)",
 				);
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
@@ -392,7 +396,7 @@
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.6;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
@@ -422,7 +426,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -447,7 +451,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};

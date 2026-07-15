@@ -14,9 +14,10 @@ struct UploadSpotView: View {
     @State private var address = ""
     @State private var directions = ""
     @State private var selectedFeatures: Set<SpotFeature> = []
-    @State private var selectedPhoto: PhotosPickerItem?
-    @State private var selectedImage: Image?
-    @State private var selectedImageData: Data?
+    @State private var selectedPhotos: [PhotosPickerItem] = []
+    @State private var selectedImages: [Image] = []
+    @State private var selectedImagesData: [Data] = []
+    private let maxPhotoCount = 5
     @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
     @State private var droppedPinCoordinate = AppConstants.defaultMapCenter
     @State private var isResolvingAddress = false
@@ -84,19 +85,35 @@ struct UploadSpotView: View {
                         }
                         .padding(.horizontal, 20)
 
-                        PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                        PhotosPicker(
+                            selection: $selectedPhotos,
+                            maxSelectionCount: maxPhotoCount,
+                            matching: .images
+                        ) {
                             VStack(spacing: 8) {
-                                if let selectedImage {
-                                    selectedImage
-                                        .resizable()
-                                        .scaledToFill()
-                                        .frame(height: 120)
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                } else {
+                                if selectedImages.isEmpty {
                                     Image(systemName: "arrow.up.circle")
                                         .font(.system(size: 32))
-                                    Text("Upload Image")
+                                    Text("Upload Photos")
                                         .font(.headline)
+                                    Text("Up to \(maxPhotoCount) images")
+                                        .font(.caption)
+                                } else {
+                                    TabView {
+                                        ForEach(selectedImages.indices, id: \.self) { index in
+                                            selectedImages[index]
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(height: 120)
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                                .accessibilityLabel("Selected photo \(index + 1)")
+                                        }
+                                    }
+                                    .frame(height: 120)
+                                    .tabViewStyle(.page(indexDisplayMode: .automatic))
+
+                                    Text("\(selectedImages.count) photo\(selectedImages.count == 1 ? "" : "s") selected")
+                                        .font(.caption)
                                 }
                             }
                             .foregroundStyle(.black.opacity(0.6))
@@ -106,13 +123,9 @@ struct UploadSpotView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                         }
                         .padding(.horizontal, 20)
-                        .onChange(of: selectedPhoto) { _, newItem in
+                        .onChange(of: selectedPhotos) { _, newItems in
                             Task {
-                                if let data = try? await newItem?.loadTransferable(type: Data.self),
-                                   let uiImage = UIImage(data: data) {
-                                    selectedImageData = data
-                                    selectedImage = Image(uiImage: uiImage)
-                                }
+                                await loadSelectedPhotos(from: newItems)
                             }
                         }
 
@@ -163,7 +176,7 @@ struct UploadSpotView: View {
 
             if isUploading {
                 Color.black.opacity(0.2).ignoresSafeArea()
-                ProgressView("Saving spot...")
+                ProgressView(uploadProgressMessage)
                     .tint(.white)
                     .foregroundStyle(.white)
             }
@@ -222,6 +235,30 @@ struct UploadSpotView: View {
         .padding(.horizontal, 20)
     }
 
+    /// Message shown while the spot and any photos are being saved.
+    private var uploadProgressMessage: String {
+        selectedImagesData.isEmpty ? "Saving spot..." : "Uploading photos..."
+    }
+
+    /// Loads preview images and upload bytes from the selected photo picker items.
+    /// - Parameter items: Photos chosen in the picker.
+    private func loadSelectedPhotos(from items: [PhotosPickerItem]) async {
+        var images: [Image] = []
+        var imageDataList: [Data] = []
+
+        for item in items {
+            guard let data = try? await item.loadTransferable(type: Data.self),
+                  let uiImage = UIImage(data: data) else {
+                continue
+            }
+            imageDataList.append(data)
+            images.append(Image(uiImage: uiImage))
+        }
+
+        selectedImagesData = imageDataList
+        selectedImages = images
+    }
+
     /// Reverse-geocodes the dropped pin and updates the address field.
     /// - Parameter coordinate: The map coordinate selected by the user.
     private func updateAddress(for coordinate: CLLocationCoordinate2D) async {
@@ -252,13 +289,14 @@ struct UploadSpotView: View {
             features: Array(selectedFeatures),
             imageNames: [],
             imageURL: nil,
+            imageURLs: [],
             averageRating: 0,
             reviewCount: 0,
             createdBy: userID
         )
 
         do {
-            try await spotService.uploadSpot(spot, imageData: selectedImageData, userID: userID)
+            try await spotService.uploadSpot(spot, imagesData: selectedImagesData, userID: userID)
             dismiss()
         } catch {
             uploadErrorMessage = error.localizedDescription

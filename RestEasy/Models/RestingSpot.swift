@@ -14,7 +14,10 @@ struct RestingSpot: Identifiable, Codable, Hashable {
     var features: [SpotFeature]
     /// Asset catalog names for seed-spot photos (supports multiple).
     var imageNames: [String]
+    /// Legacy single Firebase Storage URL kept for older Firestore documents.
     var imageURL: String?
+    /// Firebase Storage download URLs for user-uploaded spot photos.
+    var imageURLs: [String] = []
     var averageRating: Double
     var reviewCount: Int
     var createdBy: String?
@@ -48,6 +51,17 @@ extension RestingSpot {
         }
 
         let features = featureValues.compactMap(SpotFeature.init(rawValue:))
+        let legacyImageURL = data["imageURL"] as? String
+        let storedImageURLs = data["imageURLs"] as? [String] ?? []
+        let resolvedImageURLs: [String]
+        if !storedImageURLs.isEmpty {
+            resolvedImageURLs = storedImageURLs
+        } else if let legacyImageURL {
+            resolvedImageURLs = [legacyImageURL]
+        } else {
+            resolvedImageURLs = []
+        }
+
         self.init(
             id: id,
             name: name,
@@ -57,7 +71,8 @@ extension RestingSpot {
             longitude: longitude,
             features: features,
             imageNames: [],
-            imageURL: data["imageURL"] as? String,
+            imageURL: legacyImageURL,
+            imageURLs: resolvedImageURLs,
             averageRating: data["averageRating"] as? Double ?? 0,
             reviewCount: data["reviewCount"] as? Int ?? 0,
             createdBy: data["createdBy"] as? String
@@ -81,8 +96,8 @@ extension RestingSpot {
         if let directions {
             data["directions"] = directions
         }
-        if let imageURL {
-            data["imageURL"] = imageURL
+        if !imageURLs.isEmpty {
+            data["imageURLs"] = imageURLs
         }
         if let createdBy {
             data["createdBy"] = createdBy

@@ -616,27 +616,8 @@ struct MapHomeView: View {
                 }
             }
 
-            if let imageURL = spot.imageURL, let url = URL(string: imageURL) {
-                AsyncImage(url: url) { phase in
-                    switch phase {
-                    case .success(let image):
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    case .failure:
-                        Image(systemName: "photo")
-                            .font(.largeTitle)
-                            .foregroundStyle(.white.opacity(0.5))
-                    default:
-                        ProgressView()
-                            .tint(.white)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-                .frame(height: 120)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityLabel("Photo of \(spot.name)")
+            if !spot.imageURLs.isEmpty {
+                remoteSpotPhotoGallery(for: spot)
             } else {
                 seedSpotPhotoGallery(for: spot)
             }
@@ -682,6 +663,57 @@ struct MapHomeView: View {
             RoundedRectangle(cornerRadius: 12)
                 .stroke(AppTheme.sageGreen, lineWidth: 1)
         )
+    }
+
+    /// Swipeable gallery for Firebase Storage photos on user-uploaded spots.
+    /// - Parameter spot: The resting spot whose `imageURLs` should be shown.
+    /// - Returns: A paging gallery, or an empty view when no remote photos exist.
+    @ViewBuilder
+    private func remoteSpotPhotoGallery(for spot: RestingSpot) -> some View {
+        let validURLs = spot.imageURLs.compactMap(URL.init(string:))
+
+        if validURLs.isEmpty {
+            EmptyView()
+        } else if validURLs.count == 1, let url = validURLs.first {
+            remoteSpotPhoto(url: url, spotName: spot.name)
+        } else {
+            TabView {
+                ForEach(validURLs, id: \.absoluteString) { url in
+                    remoteSpotPhoto(url: url, spotName: spot.name)
+                }
+            }
+            .frame(height: 120)
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .tabViewStyle(.page(indexDisplayMode: .automatic))
+        }
+    }
+
+    /// Single remote spot photo loaded from Firebase Storage.
+    /// - Parameters:
+    ///   - url: The image download URL.
+    ///   - spotName: The resting spot name used for accessibility.
+    /// - Returns: A styled remote image view.
+    private func remoteSpotPhoto(url: URL, spotName: String) -> some View {
+        AsyncImage(url: url) { phase in
+            switch phase {
+            case .success(let image):
+                image
+                    .resizable()
+                    .scaledToFill()
+            case .failure:
+                Image(systemName: "photo")
+                    .font(.largeTitle)
+                    .foregroundStyle(.white.opacity(0.5))
+            default:
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .frame(height: 120)
+        .clipped()
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .accessibilityLabel("Photo of \(spotName)")
     }
 
     /// Swipeable gallery for asset-catalog photos listed on a seed spot.

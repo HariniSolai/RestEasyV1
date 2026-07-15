@@ -12,7 +12,7 @@ final class SpotDataService: ObservableObject {
     @Published var errorMessage: String?
 
     private let database = Firestore.firestore()
-    private let storage = Storage.storage()
+    private let storage = Storage.storage(url: "gs://resteasy-be034.firebasestorage.app")
     private var listener: ListenerRegistration?
     private var firestoreSpots: [RestingSpot] = []
 
@@ -60,14 +60,14 @@ final class SpotDataService: ObservableObject {
     /// Uploads a new resting spot so every signed-in user can see it.
     /// - Parameters:
     ///   - spot: The spot metadata to save.
-    ///   - imageData: Optional JPEG/PNG data for the spot photo.
+    ///   - imagesData: Optional image bytes for one or more spot photos.
     ///   - userID: Firebase Auth UID of the contributor.
-    func uploadSpot(_ spot: RestingSpot, imageData: Data?, userID: String) async throws {
+    func uploadSpot(_ spot: RestingSpot, imagesData: [Data], userID: String) async throws {
         var spotToUpload = spot
         spotToUpload.createdBy = userID
 
-        if let imageData {
-            spotToUpload.imageURL = try await uploadImage(imageData, spotID: spot.id)
+        if !imagesData.isEmpty {
+            spotToUpload.imageURLs = try await uploadImages(imagesData, spotID: spot.id)
         }
 
         var documentData = spotToUpload.firestoreData
@@ -180,19 +180,27 @@ final class SpotDataService: ObservableObject {
         spots = mergedSpots
     }
 
-    /// Uploads a spot photo to Firebase Storage.
+    /// Uploads one or more spot photos to Firebase Storage.
     /// - Parameters:
-    ///   - imageData: The image bytes selected by the user.
+    ///   - imagesData: The image bytes selected by the user.
     ///   - spotID: The resting spot identifier used in the storage path.
-    /// - Returns: A public download URL for the uploaded image.
-    private func uploadImage(_ imageData: Data, spotID: UUID) async throws -> String {
-        let imageReference = storage.reference().child("spots/\(spotID.uuidString)/photo.jpg")
-        let metadata = StorageMetadata()
-        metadata.contentType = "image/jpeg"
+    /// - Returns: Public download URLs for the uploaded images.
+    private func uploadImages(_ imagesData: [Data], spotID: UUID) async throws -> [String] {
+        var downloadURLs: [String] = []
 
-        _ = try await imageReference.putDataAsync(imageData, metadata: metadata)
-        let downloadURL = try await imageReference.downloadURL()
-        return downloadURL.absoluteString
+        for (index, imageData) in imagesData.enumerated() {
+            guard let jpegData = ImageUploadHelper.jpegData(from: imageData) else { continue }
+
+            let imageReference = storage.reference().child("spots/\(spotID.uuidString)/photo_\(index).jpg")
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+
+            _ = try await imageReference.putDataAsync(jpegData, metadata: metadata)
+            let downloadURL = try await imageReference.downloadURL()
+            downloadURLs.append(downloadURL.absoluteString)
+        }
+
+        return downloadURLs
     }
 
     /// Returns whether a spot includes every selected amenity filter.
