@@ -1,0 +1,23 @@
+rules_version = '2';
+
+// Copy these rules into Firebase Console → Firestore → Rules.
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /accountDeletionRequests/{userId} {
+      allow create: if request.auth != null && request.auth.uid == userId;
+      allow read, update, delete: if false;
+    }
+
+    match /reviews/{reviewId} {
+      allow read: if true;
+      allow create: if request.auth != null;
+      allow update, delete: if false;
+    }
+
+    match /contentReports/{reportId} {
+      allow create: if true;
+      allow read, update, delete: if false;
+    }
+  }
+}

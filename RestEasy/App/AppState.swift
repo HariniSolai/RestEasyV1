@@ -11,11 +11,15 @@ final class AppState: ObservableObject {
     @Published var userPhotoURL: URL?
     @Published var authErrorMessage: String?
     @Published var isAuthLoading = false
+    @Published var isSubmittingReport = false
+    @Published var reportErrorMessage: String?
     @Published var textSizeScale: Double = 1.0
     @Published var isHighContrastEnabled = false
     @Published var mapZoomLevel: Double = AppConstants.defaultMapZoomLevel
 
     private let authService: AuthService
+    private let accountDeletionService = AccountDeletionService()
+    private let contentReportService = ContentReportService()
     private var cancellables = Set<AnyCancellable>()
 
     init() {
@@ -85,6 +89,68 @@ final class AppState: ObservableObject {
         authService.signOut()
         hasCompletedTutorial = false
         authErrorMessage = authService.errorMessage
+    }
+
+    /// Submits a manual account deletion request to Firestore for admin review.
+    /// - Returns: `true` when the request was saved successfully.
+    func requestAccountDeletion() async -> Bool {
+        guard let userID = currentUserID else {
+            authErrorMessage = "You must be signed in to request account deletion."
+            return false
+        }
+
+        isAuthLoading = true
+        authErrorMessage = nil
+        defer { isAuthLoading = false }
+
+        do {
+            try await accountDeletionService.submitDeletionRequest(
+                userID: userID,
+                email: userEmail,
+                displayName: userDisplayName
+            )
+            return true
+        } catch {
+            authErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    /// Submits a content report for manual review in Firebase Console.
+    /// - Parameters:
+    ///   - target: Whether the report targets a spot or a review.
+    ///   - spot: The resting spot being reported.
+    ///   - review: Optional review being reported.
+    ///   - reason: The selected report reason.
+    ///   - details: Optional additional notes from the reporter.
+    /// - Returns: `true` when the report was saved successfully.
+    func submitContentReport(
+        target: ContentReportTarget,
+        spot: RestingSpot,
+        review: Review?,
+        reason: ContentReportReason,
+        details: String
+    ) async -> Bool {
+        isSubmittingReport = true
+        reportErrorMessage = nil
+        defer { isSubmittingReport = false }
+
+        do {
+            try await contentReportService.submitReport(
+                target: target,
+                spotID: spot.id,
+                spotName: spot.name,
+                reviewID: review?.id,
+                reviewComment: review?.comment,
+                reason: reason,
+                details: details,
+                reporterUserID: currentUserID
+            )
+            return true
+        } catch {
+            reportErrorMessage = error.localizedDescription
+            return false
+        }
     }
 
     /// Mirrors auth state from `AuthService` into view-friendly published properties.

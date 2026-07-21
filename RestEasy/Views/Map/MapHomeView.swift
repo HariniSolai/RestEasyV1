@@ -16,6 +16,7 @@ struct MapHomeView: View {
     @State private var selectedSpot: RestingSpot?
     @State private var showUploadSheet = false
     @State private var spotPendingReview: RestingSpot?
+    @State private var activeReport: ReportPresentationItem?
     @State private var showAuthSheet = false
     @State private var pendingUploadAfterAuth = false
     @State private var pendingReviewAfterAuth = false
@@ -167,6 +168,13 @@ struct MapHomeView: View {
             refreshSelectedSpotFromService()
         }) { spot in
             AddReviewView(spot: spot)
+        }
+        .sheet(item: $activeReport) { reportItem in
+            ReportContentSheet(
+                target: reportItem.target,
+                spot: reportItem.spot,
+                review: reportItem.review
+            )
         }
         .fullScreenCover(isPresented: $showAuthSheet, onDismiss: {
             if !appState.isAuthenticated {
@@ -611,6 +619,17 @@ struct MapHomeView: View {
                     .foregroundStyle(.white)
                 Spacer()
                 Button {
+                    activeReport = ReportPresentationItem(
+                        target: .spot,
+                        spot: spot,
+                        review: nil
+                    )
+                } label: {
+                    Image(systemName: "flag.fill")
+                        .foregroundStyle(.white.opacity(0.85))
+                }
+                .accessibilityLabel("Report spot")
+                Button {
                     selectedSpot = nil
                     endAllNavigation()
                     directionsService.clear()
@@ -1034,6 +1053,18 @@ struct MapHomeView: View {
                             Text(review.authorName)
                                 .font(.caption.bold())
                             Spacer()
+                            Button {
+                                activeReport = ReportPresentationItem(
+                                    target: .review,
+                                    spot: spot,
+                                    review: review
+                                )
+                            } label: {
+                                Image(systemName: "flag")
+                                    .font(.caption)
+                                    .foregroundStyle(.white.opacity(0.8))
+                            }
+                            .accessibilityLabel("Report review")
                             HStack(spacing: 2) {
                                 ForEach(1...5, id: \.self) { star in
                                     Image(systemName: star <= review.rating ? "star.fill" : "star")
@@ -1350,6 +1381,14 @@ struct FlowLayout: Layout {
 
         return (CGSize(width: maxWidth, height: currentY + lineHeight), positions)
     }
+}
+
+/// Payload used to present the report content sheet from the map.
+private struct ReportPresentationItem: Identifiable {
+    let id = UUID()
+    let target: ContentReportTarget
+    let spot: RestingSpot
+    let review: Review?
 }
 
 #Preview {

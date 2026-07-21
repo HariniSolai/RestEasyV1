@@ -13,17 +13,21 @@ final class SpotDataService: ObservableObject {
 
     private let database = Firestore.firestore()
     private let storage = Storage.storage(url: "gs://resteasy-be034.firebasestorage.app")
-    private var listener: ListenerRegistration?
+    private var spotsListener: ListenerRegistration?
+    private var reviewsListener: ListenerRegistration?
     private var firestoreSpots: [RestingSpot] = []
+    private var firestoreReviews: [Review] = []
 
     init() {
-        reviews = SeedSpots.reviews
         spots = SeedSpots.spots
+        mergeReviews()
         startListening()
+        startReviewsListening()
     }
 
     deinit {
-        listener?.remove()
+        spotsListener?.remove()
+        reviewsListener?.remove()
     }
 
     /// Returns nearby spots, optionally filtered by amenity tags and free-text query.
@@ -88,53 +92,70 @@ final class SpotDataService: ObservableObject {
             .sorted { $0.createdAt > $1.createdAt }
     }
 
-    /// Adds a user review and refreshes the spot's rating summary.
+    /// Saves a user review to Firestore and refreshes the spot's rating summary.
     /// - Parameters:
     ///   - spotID: The resting spot being reviewed.
     ///   - authorName: Display name of the signed-in user.
+    ///   - authorUserID: Firebase Auth UID of the reviewer, if available.
     ///   - rating: Star rating from 1 to 5.
-    ///   - comment: Optional written feedback.
+    ///   - comment: Written feedback from the user.
     /// - Returns: The newly created review.
     @discardableResult
     func addReview(
         spotID: UUID,
         authorName: String,
+        authorUserID: String?,
         rating: Int,
         comment: String
-    ) -> Review {
+    ) async throws -> Review {
         let clampedRating = min(5, max(1, rating))
         let review = Review(
             id: UUID(),
             spotID: spotID,
             authorName: authorName.isEmpty ? "RestEasy User" : authorName,
+            authorUserID: authorUserID,
             rating: clampedRating,
             comment: comment.trimmingCharacters(in: .whitespacesAndNewlines),
             createdAt: Date()
         )
 
-        reviews.insert(review, at: 0)
-        updateSpotRatingSummary(for: spotID)
+        try await database
+            .collection("reviews")
+            .document(review.id.uuidString)
+            .setData(review.firestoreData)
+
+        if firestoreReviews.contains(where: { $0.id == review.id }) == false {
+            firestoreReviews.insert(review, at: 0)
+        }
+        mergeReviews()
+        try await syncSpotRatingSummaryToFirestore(for: spotID)
+
         return review
     }
 
-    /// Recalculates average rating and review count for a spot after a new review.
-    /// - Parameter spotID: The resting spot identifier to update.
-    private func updateSpotRatingSummary(for spotID: UUID) {
-        let spotReviews = reviews(for: spotID)
-        guard let spotIndex = spots.firstIndex(where: { $0.id == spotID }) else { return }
+    /// Persists updated rating metadata for user-uploaded Firestore spots.
+    /// - Parameter spotID: The resting spot identifier to sync.
+    private func syncSpotRatingSummaryToFirestore(for spotID: UUID) async throws {
+        guard firestoreSpots.contains(where: { $0.id == spotID }),
+              let spotIndex = spots.firstIndex(where: { $0.id == spotID }) else {
+            return
+        }
 
-        let totalRating = spotReviews.reduce(0) { $0 + $1.rating }
-        spots[spotIndex].reviewCount = spotReviews.count
-        spots[spotIndex].averageRating = spotReviews.isEmpty
-            ? 0
-            : Double(totalRating) / Double(spotReviews.count)
+        let spot = spots[spotIndex]
+        try await database
+            .collection("spots")
+            .document(spotID.uuidString)
+            .updateData([
+                "averageRating": spot.averageRating,
+                "reviewCount": spot.reviewCount
+            ])
     }
 
     /// Subscribes to shared Firestore spots and merges them with local seed data.
     private func startListening() {
         isLoadingSpots = true
 
-        listener = database.collection("spots").addSnapshotListener { [weak self] snapshot, error in
+        spotsListener = database.collection("spots").addSnapshotListener { [weak self] snapshot, error in
             Task { @MainActor in
                 guard let self else { return }
                 self.isLoadingSpots = false
@@ -149,6 +170,37 @@ final class SpotDataService: ObservableObject {
                 self.mergeSpots()
             }
         }
+    }
+
+    /// Subscribes to shared Firestore reviews and merges them with bundled seed reviews.
+    private func startReviewsListening() {
+        reviewsListener = database.collection("reviews").addSnapshotListener { [weak self] snapshot, error in
+            Task { @MainActor in
+                guard let self else { return }
+
+                if let error {
+                    self.errorMessage = error.localizedDescription
+                    return
+                }
+
+                guard let documents = snapshot?.documents else { return }
+                self.firestoreReviews = documents.compactMap(Review.init(document:))
+                self.mergeReviews()
+            }
+        }
+    }
+
+    /// Combines Firestore reviews with bundled seed reviews.
+    private func mergeReviews() {
+        var mergedReviews = firestoreReviews
+        let firestoreReviewIDs = Set(firestoreReviews.map(\.id))
+
+        for seedReview in SeedSpots.reviews where !firestoreReviewIDs.contains(seedReview.id) {
+            mergedReviews.append(seedReview)
+        }
+
+        reviews = mergedReviews.sorted { $0.createdAt > $1.createdAt }
+        mergeSpots()
     }
 
     /// Combines bundled seed spots with user-uploaded Firestore spots.

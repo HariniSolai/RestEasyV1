@@ -11,6 +11,8 @@ struct ProfileView: View {
     @State private var editedDisplayName = ""
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var photoUploadErrorMessage: String?
+    @State private var showDeleteAccountConfirmation = false
+    @State private var showDeleteAccountSuccess = false
 
     var body: some View {
         ZStack {
@@ -49,6 +51,30 @@ struct ProfileView: View {
             }
         } message: {
             Text(photoUploadErrorMessage ?? "Unable to update your profile photo.")
+        }
+        .alert("Delete Account?", isPresented: $showDeleteAccountConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Submit Request", role: .destructive) {
+                Task {
+                    await submitDeleteAccountRequest()
+                }
+            }
+        } message: {
+            Text("Submit a request to delete your account? We'll process it manually. This cannot be undone once processed.")
+        }
+        .alert("Deletion Request Submitted", isPresented: $showDeleteAccountSuccess) {
+            Button("OK", role: .cancel) {
+                appState.logout()
+            }
+        } message: {
+            Text("Your deletion request was submitted. We'll remove your account after review.")
+        }
+        .alert("Delete Account Error", isPresented: deleteAccountErrorBinding) {
+            Button("OK", role: .cancel) {
+                appState.authErrorMessage = nil
+            }
+        } message: {
+            Text(appState.authErrorMessage ?? "Unable to submit your deletion request.")
         }
     }
 
@@ -96,6 +122,25 @@ struct ProfileView: View {
                         .background(AppTheme.cream)
                         .clipShape(Capsule())
                 }
+                .disabled(appState.isAuthLoading)
+
+                Button {
+                    showDeleteAccountConfirmation = true
+                } label: {
+                    Text("Delete Account")
+                        .font(.headline.bold())
+                        .foregroundStyle(.red.opacity(0.95))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(AppTheme.cream.opacity(0.9))
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(Color.red.opacity(0.45), lineWidth: 1)
+                        )
+                }
+                .disabled(appState.isAuthLoading)
+                .accessibilityLabel("Delete Account")
             }
             .padding(.top, 8)
         }
@@ -171,6 +216,26 @@ struct ProfileView: View {
                 }
             }
         )
+    }
+
+    /// Binding that presents an alert when account deletion request submission fails.
+    private var deleteAccountErrorBinding: Binding<Bool> {
+        Binding(
+            get: { appState.authErrorMessage != nil && !showDeleteAccountSuccess },
+            set: { isPresented in
+                if !isPresented {
+                    appState.authErrorMessage = nil
+                }
+            }
+        )
+    }
+
+    /// Sends the signed-in user's account deletion request to Firestore.
+    private func submitDeleteAccountRequest() async {
+        let didSubmit = await appState.requestAccountDeletion()
+        if didSubmit {
+            showDeleteAccountSuccess = true
+        }
     }
 
     /// Read-only account fields such as the signup email.

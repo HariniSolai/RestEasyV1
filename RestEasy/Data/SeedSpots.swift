@@ -184,6 +184,7 @@ enum SeedSpots {
                 id: UUID(uuidString: "B1000001-0000-4000-8000-000000000001")!,
                 spotID: IDs.maryBartelmePark,
                 authorName: "Alex R.",
+                authorUserID: nil,
                 rating: 5,
                 comment: "Shaded benches and a calm vibe — perfect study break spot.",
                 createdAt: Date().addingTimeInterval(-86_400)
@@ -192,6 +193,7 @@ enum SeedSpots {
                 id: UUID(uuidString: "B1000001-0000-4000-8000-000000000002")!,
                 spotID: IDs.maryBartelmePark,
                 authorName: "Jordan P.",
+                authorUserID: nil,
                 rating: 4,
                 comment: "Nice park in the West Loop. Easy to find near Sangamon.",
                 createdAt: Date().addingTimeInterval(-172_800)
@@ -200,6 +202,7 @@ enum SeedSpots {
                 id: UUID(uuidString: "B1000001-0000-4000-8000-000000000003")!,
                 spotID: IDs.uicEastCampusQuad,
                 authorName: "Sam T.",
+                authorUserID: nil,
                 rating: 4,
                 comment: "Convenient between classes. Grab a bench under the trees.",
                 createdAt: Date().addingTimeInterval(-259_200)

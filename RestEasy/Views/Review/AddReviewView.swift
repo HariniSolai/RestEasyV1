@@ -11,6 +11,8 @@ struct AddReviewView: View {
     @State private var rating = 5
     @State private var comment = ""
     @State private var didSubmit = false
+    @State private var isSubmitting = false
+    @State private var submitErrorMessage: String?
 
     private var canSubmit: Bool {
         (1...5).contains(rating) && !comment.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -63,11 +65,13 @@ struct AddReviewView: View {
                             .foregroundStyle(.black)
                     }
 
-                    PrimaryButton(title: "Submit Review") {
-                        submitReview()
+                    PrimaryButton(title: isSubmitting ? "Submitting..." : "Submit Review") {
+                        Task {
+                            await submitReview()
+                        }
                     }
-                    .disabled(!canSubmit)
-                    .opacity(canSubmit ? 1 : 0.6)
+                    .disabled(!canSubmit || isSubmitting)
+                    .opacity(canSubmit && !isSubmitting ? 1 : 0.6)
 
                     Spacer()
                 }
@@ -93,18 +97,46 @@ struct AddReviewView: View {
             } message: {
                 Text("Your review was added to \(spot.name).")
             }
+            .alert("Review Error", isPresented: submitErrorBinding) {
+                Button("OK", role: .cancel) {
+                    submitErrorMessage = nil
+                }
+            } message: {
+                Text(submitErrorMessage ?? "Unable to submit your review.")
+            }
         }
     }
 
-    /// Saves the review through the spot service using the signed-in display name.
-    private func submitReview() {
-        spotService.addReview(
-            spotID: spot.id,
-            authorName: appState.userDisplayName,
-            rating: rating,
-            comment: comment
+    /// Saves the review to Firestore using the signed-in user's profile details.
+    private func submitReview() async {
+        isSubmitting = true
+        submitErrorMessage = nil
+        defer { isSubmitting = false }
+
+        do {
+            try await spotService.addReview(
+                spotID: spot.id,
+                authorName: appState.userDisplayName,
+                authorUserID: appState.currentUserID,
+                rating: rating,
+                comment: comment
+            )
+            didSubmit = true
+        } catch {
+            submitErrorMessage = error.localizedDescription
+        }
+    }
+
+    /// Binding that presents an alert when review submission fails.
+    private var submitErrorBinding: Binding<Bool> {
+        Binding(
+            get: { submitErrorMessage != nil },
+            set: { isPresented in
+                if !isPresented {
+                    submitErrorMessage = nil
+                }
+            }
         )
-        didSubmit = true
     }
 }
 
