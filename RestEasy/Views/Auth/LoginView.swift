@@ -65,13 +65,21 @@ struct LoginView: View {
 
                         HStack {
                             Button("forgot password?") {
+                                let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+                                guard !trimmedEmail.isEmpty else {
+                                    appState.authErrorMessage = "Please enter your email address first."
+                                    showResetConfirmation = true
+                                    return
+                                }
+
                                 Task {
-                                    await appState.sendPasswordReset(email: email)
+                                    await appState.sendPasswordReset(email: trimmedEmail)
                                     showResetConfirmation = true
                                 }
                             }
                             .font(.caption)
                             .foregroundStyle(AppTheme.cream.opacity(0.7))
+                            .disabled(appState.isAuthLoading)
                             Spacer()
                         }
                     }

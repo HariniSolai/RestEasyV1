@@ -18,6 +18,9 @@ enum AppConstants {
     /// Default zoom that shows the UIC / West Loop neighborhood.
     static let defaultMapZoomLevel = 0.2
 
+    /// Share of the map content area reserved for the map when a spot detail panel is open.
+    static let spotDetailMapHeightRatio: CGFloat = 0.5
+
     /// Camera altitude (meters) while following the user during live guidance.
     static let liveNavigationCameraDistance: CLLocationDistance = 350
 

@@ -111,8 +111,14 @@ final class AuthService: ObservableObject {
     /// Sends a password reset email to the given address.
     /// - Parameter email: The account email address.
     func sendPasswordReset(email: String) async {
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEmail.isEmpty else {
+            errorMessage = "Please enter a valid email address."
+            return
+        }
+
         await performAuthOperation {
-            try await Auth.auth().sendPasswordReset(withEmail: email)
+            try await Auth.auth().sendPasswordReset(withEmail: normalizedEmail)
         }
     }
 

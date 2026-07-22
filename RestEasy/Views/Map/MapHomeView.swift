@@ -93,6 +93,11 @@ struct MapHomeView: View {
         appState.mapZoomLevel > AppConstants.mapZoomRange.lowerBound
     }
 
+    /// Whether the map and spot detail panels share the content area vertically.
+    private var showsSpotDetailSplit: Bool {
+        selectedSpot != nil && !isNavigating && !isLiveGuidance
+    }
+
     var body: some View {
         ZStack {
             AppTheme.forestGreen.ignoresSafeArea()
@@ -127,26 +132,34 @@ struct MapHomeView: View {
                 .padding(.top, 8)
                 .zIndex(1)
 
-                mapSection
-                    .padding(.horizontal, 16)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                GeometryReader { geometry in
+                    VStack(spacing: 0) {
+                        mapSection
+                            .padding(.horizontal, 16)
+                            .padding(.top, 12)
+                            .padding(.bottom, 8)
+                            .frame(height: mapContentHeight(in: geometry))
 
-                if let spot = selectedSpot {
-                    if isLiveGuidance {
-                        liveGuidancePanel(for: spot)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else if isNavigating {
-                        activeNavigationPanel(for: spot)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
-                    } else {
-                        spotDetailPanels(for: spot)
-                            .transition(.move(edge: .bottom).combined(with: .opacity))
+                        if let spot = selectedSpot {
+                            if isLiveGuidance {
+                                liveGuidancePanel(for: spot)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            } else if isNavigating {
+                                activeNavigationPanel(for: spot)
+                                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                            } else {
+                                ScrollView {
+                                    spotDetailPanels(for: spot)
+                                }
+                                .frame(
+                                    height: geometry.size.height * (1 - AppConstants.spotDetailMapHeightRatio)
+                                )
+                                .transition(.move(edge: .bottom).combined(with: .opacity))
+                            }
+                        }
                     }
                 }
-
-                // Leaves a clear band above the root tab bar so the map is cropped short.
-                Spacer(minLength: 12)
+                .frame(maxHeight: .infinity)
             }
 
             VStack {
@@ -251,6 +264,15 @@ struct MapHomeView: View {
         guard mapFocusCenter == nil, !isNavigating, !isLiveGuidance else { return }
         updateSearchRegion()
         updateCamera()
+    }
+
+    /// Returns the map height for the current layout mode within the content area.
+    /// - Parameter geometry: The geometry proxy for the map and detail panel stack.
+    /// - Returns: Full content height, or half when spot detail is shown.
+    private func mapContentHeight(in geometry: GeometryProxy) -> CGFloat {
+        showsSpotDetailSplit
+            ? geometry.size.height * AppConstants.spotDetailMapHeightRatio
+            : geometry.size.height
     }
 
     /// Clears search text side effects and restores the default map focus.
@@ -529,7 +551,6 @@ struct MapHomeView: View {
             }
             .mapStyle(.standard(elevation: .realistic))
             .clipShape(RoundedRectangle(cornerRadius: 12))
-            .frame(maxHeight: selectedSpot == nil || isNavigating || isLiveGuidance ? .infinity : 220)
             .animation(.easeInOut(duration: 0.3), value: selectedSpot?.id)
             .animation(.easeInOut(duration: 0.3), value: isNavigating)
             .animation(.easeInOut(duration: 0.3), value: isLiveGuidance)
