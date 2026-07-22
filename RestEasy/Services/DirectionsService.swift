@@ -4,7 +4,10 @@ import CoreLocation
 
 /// Travel modes available for in-app directions to a resting spot.
 enum TravelMode: String, CaseIterable, Identifiable {
+    // Declaration order drives the picker order; `walking` is first so it is the
+    // default (see `DirectionsService.travelMode`) and the main option.
     case walking
+    case cycling
     case automobile
     case transit
 
@@ -14,6 +17,7 @@ enum TravelMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .walking: return "Walk"
+        case .cycling: return "Bike"
         case .automobile: return "Drive"
         case .transit: return "Transit"
         }
@@ -23,15 +27,20 @@ enum TravelMode: String, CaseIterable, Identifiable {
     var systemImage: String {
         switch self {
         case .walking: return "figure.walk"
+        case .cycling: return "bicycle"
         case .automobile: return "car.fill"
         case .transit: return "bus.fill"
         }
     }
 
     /// MapKit transport type used when requesting directions.
+    ///
+    /// MapKit has no dedicated cycling route type, so `cycling` reuses walking
+    /// paths, which best approximate bike-friendly routes for short city trips.
     var mapKitTransportType: MKDirectionsTransportType {
         switch self {
         case .walking: return .walking
+        case .cycling: return .walking
         case .automobile: return .automobile
         case .transit: return .transit
         }

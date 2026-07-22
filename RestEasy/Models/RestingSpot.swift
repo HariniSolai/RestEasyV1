@@ -109,39 +109,37 @@ extension RestingSpot {
 
 /// Amenities available at a resting spot.
 enum SpotFeature: String, Codable, CaseIterable, Identifiable {
-    case bench = "Bench"
-    case park = "Park"
-    case shadedLocation = "Shaded Location"
-    case restroom = "Restroom"
-    case waterFountain = "Water Fountain"
-    case accessible = "Accessible"
+    // Declaration order controls the filter-chip order (via `CaseIterable`).
     case seating = "Seating"
+    case restroom = "Restroom"
+    case accessible = "Accessible"
+    case park = "Park"
+    case sheltered = "Sheltered"
+    case waterFountain = "Water Fountain"
 
     var id: String { rawValue }
 
     /// SF Symbol used on filter chips and search suggestions.
     var systemImage: String {
         switch self {
-        case .bench: return "chair.fill"
         case .park: return "leaf.fill"
-        case .shadedLocation: return "cloud.sun.fill"
+        case .sheltered: return "cloud.sun.fill"
         case .restroom: return "toilet"
         case .waterFountain: return "drop.fill"
         case .accessible: return "figure.roll"
-        case .seating: return "sofa.fill"
+        case .seating: return "chair.fill"
         }
     }
 
     /// Extra words users might type when searching for this amenity.
     var searchKeywords: [String] {
         switch self {
-        case .bench: return ["bench", "benches"]
         case .park: return ["park", "parks", "green space"]
-        case .shadedLocation: return ["shade", "shaded", "tree", "trees"]
+        case .sheltered: return ["sheltered", "shelter", "covered", "shade", "shaded", "canopy", "roof"]
         case .restroom: return ["restroom", "restrooms", "bathroom", "bathrooms", "toilet", "toilets"]
         case .waterFountain: return ["water", "fountain", "drink", "drinking"]
         case .accessible: return ["accessible", "accessibility", "ada", "wheelchair"]
-        case .seating: return ["seat", "seating", "sit", "chairs"]
+        case .seating: return ["seat", "seating", "sit", "chairs", "bench", "benches"]
         }
     }
 

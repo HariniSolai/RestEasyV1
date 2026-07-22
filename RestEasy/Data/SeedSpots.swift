@@ -39,7 +39,7 @@ enum SeedSpots {
                 directions: "Quiet West Loop park with benches under trees near the playground.",
                 latitude: 41.8796,
                 longitude: -87.6510,
-                features: [.bench, .park, .shadedLocation, .seating],
+                features: [.park, .sheltered, .seating],
                 imageNames: [
                     "spot-mary-bartelme",
                     "spot-mary-bartelme-2"
@@ -56,7 +56,7 @@ enum SeedSpots {
                 directions: "Open lawn seating between lecture halls; look for shaded benches along the walkways.",
                 latitude: 41.8719,
                 longitude: -87.6476,
-                features: [.bench, .shadedLocation, .seating, .accessible],
+                features: [.sheltered, .seating, .accessible],
                 imageNames: [],
                 averageRating: 4.2,
                 reviewCount: 14
@@ -70,7 +70,7 @@ enum SeedSpots {
                 directions: "Park benches near the Randolph Street entrance; good shade in the afternoon.",
                 latitude: 41.8843,
                 longitude: -87.6650,
-                features: [.bench, .park, .shadedLocation, .waterFountain],
+                features: [.seating, .park, .sheltered, .waterFountain],
                 imageNames: [],
                 averageRating: 4.4,
                 reviewCount: 6
@@ -83,7 +83,7 @@ enum SeedSpots {
                 directions: "Seating areas in front of the Starbucks in the UIC ARC Building",
                 latitude: 41.874585,
                 longitude: -87.650228,
-                features: [.bench],
+                features: [.seating],
                 imageNames: ["arcImg1", "arcImg2", "arcImg3"],
                 averageRating: 0,
                 reviewCount: 0
@@ -95,7 +95,7 @@ enum SeedSpots {
                 directions: "Place to sit as you get on the bridge to the UIC-Blue line station",
                 latitude: 41.874693,
                 longitude: -87.649724,
-                features: [.bench, .accessible, .seating],
+                features: [.accessible, .seating],
                 imageNames: ["bridge1", "bridge2", "bridge3", "bridge4"],
                 averageRating: 0,
                 reviewCount: 0
@@ -107,7 +107,7 @@ enum SeedSpots {
                 directions: "Place to sit at right near the road next to the Student Residence and Commons",
                 latitude: 41.874282,
                 longitude: -87.649813,
-                features: [.bench, .accessible, .seating],
+                features: [.accessible, .seating],
                 imageNames: ["nearCross1", "nearCross2"],
                 averageRating: 0,
                 reviewCount: 0
@@ -119,7 +119,7 @@ enum SeedSpots {
                 directions: "On the side of the sidewalk/path surrounded by green area",
                 latitude: 41.873529,
                 longitude: -87.649874,
-                features: [.bench, .accessible, .seating],
+                features: [.accessible, .seating],
                 imageNames: ["UICCampus1"],
                 averageRating: 0,
                 reviewCount: 0
@@ -132,7 +132,7 @@ enum SeedSpots {
                 directions: "Near the dead end on the road, on the side of the sidewalk/path near the UIC Behavioral Sciences Building",
                 latitude: 41.873196,
                 longitude: -87.651953,
-                features: [.bench, .seating],
+                features: [.seating],
                 imageNames: ["Bsb1", "Bsb2", "Bsb3", "Bsb4"],
                 averageRating: 0,
                 reviewCount: 0
@@ -144,7 +144,7 @@ enum SeedSpots {
                 directions: "Take the stairs outside from behind the UIC Student Center East Building or come up to the second floor from the inside using the indoor elevators/excalators/stairs",
                 latitude: 41.872651,
                 longitude: -87.648080,
-                features: [.bench, .seating],
+                features: [.seating],
                 imageNames: ["UICSCE1", "UICSCE2", "UICSCE3", "UICSCE4"],
                 averageRating: 0,
                 reviewCount: 0
@@ -160,7 +160,7 @@ enum SeedSpots {
             //     directions: "Short tip on how to find it or what makes it good.",
             //     latitude: 41.8700,
             //     longitude: -87.6500,
-            //     features: [.bench, .park, .shadedLocation],
+            //     features: [.park, .sheltered, .seating],
             //     imageNames: [
             //         "spot-my-bench-1",
             //         "spot-my-bench-2"
@@ -170,7 +170,7 @@ enum SeedSpots {
             // ),
             //
             // Available features:
-            //   .bench, .park, .shadedLocation, .restroom,
+            //   .park, .sheltered, .restroom,
             //   .waterFountain, .accessible, .seating
             // ============================================================
         ]

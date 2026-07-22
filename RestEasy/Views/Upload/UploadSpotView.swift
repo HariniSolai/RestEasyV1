@@ -46,20 +46,19 @@ struct UploadSpotView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    HStack {
-                        Spacer()
-                        Button {
-                            dismiss()
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.title3.bold())
-                                .foregroundStyle(.black)
-                        }
-                    }
-                    .padding(.horizontal, 24)
-                    .padding(.top, 16)
-
                     VStack(spacing: 16) {
+                        HStack {
+                            Spacer()
+                            Button {
+                                dismiss()
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.title3.bold())
+                                    .foregroundStyle(.black)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Tap the map to place the resting spot")
                                 .font(.caption)
@@ -195,9 +194,10 @@ struct UploadSpotView: View {
                         .padding(.bottom, 24)
                     }
                     .padding(.vertical, 16)
-                    .background(AppTheme.sageGreen)
+                    .background(AppTheme.mutedGreen)
                     .clipShape(RoundedRectangle(cornerRadius: 20))
                     .padding(.horizontal, 12)
+                    .padding(.top, 8)
                 }
             }
 
@@ -231,7 +231,7 @@ struct UploadSpotView: View {
                 .font(.subheadline.bold())
                 .foregroundStyle(.black.opacity(0.7))
 
-            Text("Select amenities like Bench, Restroom, or Park.")
+            Text("Select amenities like Seating, Restroom, or Park.")
                 .font(.caption)
                 .foregroundStyle(.black.opacity(0.55))
 

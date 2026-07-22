@@ -2,6 +2,10 @@ import SwiftUI
 
 /// Accessibility and display preference settings.
 struct SettingsView: View {
+    /// Whether to show the "Done" button. `true` when presented as a sheet
+    /// (e.g. from Profile); `false` when embedded as a bottom tab.
+    var showsDoneButton = true
+
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
@@ -83,12 +87,14 @@ struct SettingsView: View {
 
                 Spacer()
 
-                Button("Done") {
-                    dismiss()
+                if showsDoneButton {
+                    Button("Done") {
+                        dismiss()
+                    }
+                    .font(.headline)
+                    .foregroundStyle(AppTheme.cream)
+                    .padding(.bottom, 32)
                 }
-                .font(.headline)
-                .foregroundStyle(AppTheme.cream)
-                .padding(.bottom, 32)
             }
         }
         .presentationDetents([.large])

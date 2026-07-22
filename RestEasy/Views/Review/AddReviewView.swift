@@ -149,7 +149,7 @@ struct AddReviewView: View {
             directions: "Near the entrance",
             latitude: 41.87,
             longitude: -87.65,
-            features: [.bench],
+            features: [.seating],
             imageNames: [],
             averageRating: 4,
             reviewCount: 1

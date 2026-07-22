@@ -12,6 +12,7 @@ struct RestEasyApp: App {
     init() {
         FirebaseApp.configure()
         Self.configureOpaqueCreamTabBar()
+        Self.configureTravelModePickerAppearance()
     }
 
     var body: some Scene {
@@ -62,6 +63,24 @@ struct RestEasyApp: App {
         tabBar.scrollEdgeAppearance = appearance
         tabBar.isTranslucent = false
     }
+
+    /// Colors the travel-mode segmented control's unselected track muted green.
+    ///
+    /// The selected segment keeps its existing light highlight, so its label is
+    /// drawn in dark forest green for contrast, while unselected labels use white
+    /// against the muted-green track.
+    private static func configureTravelModePickerAppearance() {
+        let segmentedControl = UISegmentedControl.appearance()
+        segmentedControl.backgroundColor = UIColor(AppTheme.mutedGreen)
+        segmentedControl.setTitleTextAttributes(
+            [.foregroundColor: UIColor.white],
+            for: .normal
+        )
+        segmentedControl.setTitleTextAttributes(
+            [.foregroundColor: UIColor(AppTheme.forestGreen)],
+            for: .selected
+        )
+    }
 }
 
 /// Root shell with a bottom tab bar: Map for discovery, Profile for account.
@@ -76,6 +95,11 @@ struct RootView: View {
             ProfileView()
                 .tabItem {
                     Label("Profile", systemImage: "person.fill")
+                }
+
+            SettingsView(showsDoneButton: false)
+                .tabItem {
+                    Label("Settings", systemImage: "gearshape.fill")
                 }
         }
         .tint(AppTheme.forestGreen)

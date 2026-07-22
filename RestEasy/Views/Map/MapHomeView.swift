@@ -17,10 +17,10 @@ struct MapHomeView: View {
     @State private var showUploadSheet = false
     @State private var spotPendingReview: RestingSpot?
     @State private var activeReport: ReportPresentationItem?
+    @State private var expandedPhoto: ExpandedPhoto?
     @State private var showAuthSheet = false
     @State private var pendingUploadAfterAuth = false
     @State private var pendingReviewAfterAuth = false
-    @State private var showSettings = false
     @State private var showMapSizeSheet = false
     @State private var cameraPosition: MapCameraPosition = .region(AppConstants.defaultMapRegion)
     @State private var mapFocusCenter: CLLocationCoordinate2D?
@@ -146,7 +146,7 @@ struct MapHomeView: View {
                             .padding(.horizontal, 16)
                             .padding(.top, 12)
                             .padding(.bottom, 8)
-                            .frame(height: mapContentHeight(in: geometry))
+                            .frame(maxHeight: mapMaxHeight(in: geometry))
 
                         if let spot = selectedSpot {
                             if isLiveGuidance {
@@ -194,6 +194,9 @@ struct MapHomeView: View {
                 review: reportItem.review
             )
         }
+        .fullScreenCover(item: $expandedPhoto) { photo in
+            FullScreenPhotoView(photo: photo)
+        }
         .fullScreenCover(isPresented: $showAuthSheet, onDismiss: {
             if !appState.isAuthenticated {
                 pendingUploadAfterAuth = false
@@ -201,9 +204,6 @@ struct MapHomeView: View {
             }
         }) {
             WelcomeView()
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
         }
         .sheet(isPresented: $showMapSizeSheet) {
             MapSizeSheet(cameraPosition: $cameraPosition)
@@ -293,13 +293,18 @@ struct MapHomeView: View {
         updateCamera()
     }
 
-    /// Returns the map height for the current layout mode within the content area.
-    /// - Parameter geometry: The geometry proxy for the map and detail panel stack.
-    /// - Returns: Full content height, or half when spot detail is shown.
-    private func mapContentHeight(in geometry: GeometryProxy) -> CGFloat {
+    /// Returns the maximum map height for the current layout mode.
+    ///
+    /// In the spot-detail split the map is capped at half the content area so the
+    /// scrollable detail fills the other half. In every other mode (no selection,
+    /// route review, or live guidance) the map is flexible, letting an
+    /// intrinsic-height navigation panel keep its space at the bottom.
+    /// - Parameter geometry: The geometry proxy for the map and panel stack.
+    /// - Returns: Half the content height when split, otherwise `.infinity`.
+    private func mapMaxHeight(in geometry: GeometryProxy) -> CGFloat {
         showsSpotDetailSplit
             ? geometry.size.height * AppConstants.spotDetailMapHeightRatio
-            : geometry.size.height
+            : .infinity
     }
 
     /// Clears search text side effects and restores the default map focus.
@@ -349,14 +354,6 @@ struct MapHomeView: View {
                     Image(systemName: "xmark.circle.fill")
                         .foregroundStyle(AppTheme.inputPlaceholder)
                 }
-            }
-
-            Button {
-                isSearchFieldFocused = false
-                showSettings = true
-            } label: {
-                Image(systemName: "gearshape.fill")
-                    .foregroundStyle(AppTheme.inputPlaceholder)
             }
         }
         .padding(.horizontal, 16)
@@ -798,7 +795,56 @@ struct MapHomeView: View {
         .frame(height: 120)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .topTrailing) {
+            expandPhotoButton(source: .remote(url), spotName: spotName)
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            expandedPhoto = ExpandedPhoto(source: .remote(url), spotName: spotName)
+        }
         .accessibilityLabel("Photo of \(spotName)")
+    }
+
+    /// Corner button that opens a photo full screen.
+    /// - Parameters:
+    ///   - source: The remote URL or asset name to present.
+    ///   - spotName: The resting spot name used for accessibility.
+    /// - Returns: A small overlay button with an expand icon.
+    private func expandPhotoButton(source: ExpandedPhoto.Source, spotName: String) -> some View {
+        Button {
+            expandedPhoto = ExpandedPhoto(source: source, spotName: spotName)
+        } label: {
+            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                .font(.caption.bold())
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(.black.opacity(0.45), in: Circle())
+        }
+        .padding(8)
+        .accessibilityLabel("Expand photo of \(spotName)")
+    }
+
+    /// Single asset-catalog photo for a seed spot.
+    /// - Parameters:
+    ///   - imageName: The asset name to render.
+    ///   - spotName: The resting spot name used for accessibility.
+    /// - Returns: A tappable, expandable seed photo.
+    private func seedSpotPhoto(imageName: String, spotName: String) -> some View {
+        Image(imageName)
+            .resizable()
+            .scaledToFill()
+            .frame(maxWidth: .infinity)
+            .frame(height: 120)
+            .clipped()
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .topTrailing) {
+                expandPhotoButton(source: .asset(imageName), spotName: spotName)
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                expandedPhoto = ExpandedPhoto(source: .asset(imageName), spotName: spotName)
+            }
+            .accessibilityLabel("Photo of \(spotName)")
     }
 
     /// Swipeable gallery for asset-catalog photos listed on a seed spot.
@@ -811,24 +857,11 @@ struct MapHomeView: View {
         if availableImageNames.isEmpty {
             EmptyView()
         } else if availableImageNames.count == 1, let imageName = availableImageNames.first {
-            Image(imageName)
-                .resizable()
-                .scaledToFill()
-                .frame(maxWidth: .infinity)
-                .frame(height: 120)
-                .clipped()
-                .clipShape(RoundedRectangle(cornerRadius: 8))
-                .accessibilityLabel("Photo of \(spot.name)")
+            seedSpotPhoto(imageName: imageName, spotName: spot.name)
         } else {
             TabView {
                 ForEach(availableImageNames, id: \.self) { imageName in
-                    Image(imageName)
-                        .resizable()
-                        .scaledToFill()
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 120)
-                        .clipped()
-                        .accessibilityLabel("Photo of \(spot.name)")
+                    seedSpotPhoto(imageName: imageName, spotName: spot.name)
                 }
             }
             .frame(height: 120)
@@ -1451,6 +1484,108 @@ private struct ReportPresentationItem: Identifiable {
     let target: ContentReportTarget
     let spot: RestingSpot
     let review: Review?
+}
+
+/// A spot photo to present full screen, from Firebase Storage or the asset catalog.
+struct ExpandedPhoto: Identifiable {
+    /// Where the full-size image is loaded from.
+    enum Source {
+        case remote(URL)
+        case asset(String)
+    }
+
+    let id = UUID()
+    let source: Source
+    let spotName: String
+}
+
+/// Full-screen photo viewer with pinch-to-zoom, double-tap zoom, and a close button.
+struct FullScreenPhotoView: View {
+    let photo: ExpandedPhoto
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var zoomScale: CGFloat = 1
+    @State private var committedScale: CGFloat = 1
+
+    private let minScale: CGFloat = 1
+    private let maxScale: CGFloat = 5
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+
+            image
+                .scaledToFit()
+                .scaleEffect(zoomScale)
+                .gesture(magnification)
+                .onTapGesture(count: 2) { toggleZoom() }
+                .accessibilityLabel("Photo of \(photo.spotName)")
+
+            closeButton
+        }
+    }
+
+    /// Loads the underlying image from a remote URL or the asset catalog.
+    @ViewBuilder
+    private var image: some View {
+        switch photo.source {
+        case .remote(let url):
+            AsyncImage(url: url) { phase in
+                switch phase {
+                case .success(let loadedImage):
+                    loadedImage.resizable()
+                case .failure:
+                    Image(systemName: "photo")
+                        .font(.largeTitle)
+                        .foregroundStyle(.white.opacity(0.6))
+                default:
+                    ProgressView().tint(.white)
+                }
+            }
+        case .asset(let name):
+            Image(name).resizable()
+        }
+    }
+
+    private var closeButton: some View {
+        VStack {
+            HStack {
+                Spacer()
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.headline.bold())
+                        .foregroundStyle(.white)
+                        .padding(12)
+                        .background(.black.opacity(0.5), in: Circle())
+                }
+                .accessibilityLabel("Close photo")
+                .padding(16)
+            }
+            Spacer()
+        }
+    }
+
+    /// Pinch gesture that scales the image within the allowed zoom range.
+    private var magnification: some Gesture {
+        MagnifyGesture()
+            .onChanged { value in
+                zoomScale = min(max(committedScale * value.magnification, minScale), maxScale)
+            }
+            .onEnded { _ in
+                committedScale = zoomScale
+            }
+    }
+
+    /// Toggles between fit and 2.5x zoom on double tap.
+    private func toggleZoom() {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            let targetScale: CGFloat = zoomScale > minScale ? minScale : 2.5
+            zoomScale = targetScale
+            committedScale = targetScale
+        }
+    }
 }
 
 #Preview {
