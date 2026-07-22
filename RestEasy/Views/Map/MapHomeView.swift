@@ -29,6 +29,12 @@ struct MapHomeView: View {
     @State private var isLiveGuidance = false
     @FocusState private var isSearchFieldFocused: Bool
 
+    @StateObject private var tutorial = TutorialCoordinator()
+
+    /// Persists across launches so the guided tour only auto-runs on first open.
+    /// Shared by key with `SettingsView` so "Replay Tutorial" can re-trigger it.
+    @AppStorage("hasCompletedMapTutorial") private var hasCompletedMapTutorial = false
+
     /// Origin used for routing: live GPS when available, otherwise Chicago.
     private var routeOrigin: CLLocationCoordinate2D {
         locationManager.userLocation
@@ -105,8 +111,10 @@ struct MapHomeView: View {
             VStack(spacing: 0) {
                 VStack(spacing: 8) {
                     searchBar
+                        .tutorialAnchor(.search)
 
                     featureFilterChips
+                        .tutorialAnchor(.filters)
 
                     if shouldShowSearchSuggestions {
                         searchSuggestionsList
@@ -162,6 +170,15 @@ struct MapHomeView: View {
                 .frame(maxHeight: .infinity)
             }
         }
+        .overlayPreferenceValue(TutorialAnchorKey.self) { anchors in
+            GeometryReader { proxy in
+                if tutorial.isActive {
+                    TutorialOverlay(coordinator: tutorial, anchors: anchors, proxy: proxy)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .animation(.easeInOut(duration: 0.25), value: tutorial.isActive)
         .sheet(isPresented: $showUploadSheet) {
             UploadSpotView()
         }
@@ -195,6 +212,19 @@ struct MapHomeView: View {
             locationManager.requestLocation()
             updateSearchRegion()
             updateCamera()
+            startTutorialIfNeeded()
+        }
+        .onChange(of: tutorial.isActive) { _, isActive in
+            // Remember completion once the user finishes or skips the tour.
+            if !isActive {
+                hasCompletedMapTutorial = true
+            }
+        }
+        .onChange(of: hasCompletedMapTutorial) { _, isCompleted in
+            // Settings' "Replay Tutorial" flips this back to false; restart the tour.
+            if !isCompleted {
+                startTutorialIfNeeded()
+            }
         }
         .onReceive(locationManager.$userLocation) { _ in
             if isLiveGuidance {
@@ -245,6 +275,15 @@ struct MapHomeView: View {
             guard !isApproximate, selectedSpot != nil, !isLiveGuidance else { return }
             Task { await refreshDirections(for: selectedSpot) }
         }
+    }
+
+    /// Starts the guided tour when it hasn't been completed and isn't already running.
+    ///
+    /// The first step is a target-less welcome card, so it is safe to start on
+    /// `onAppear` before the feature anchors finish laying out.
+    private func startTutorialIfNeeded() {
+        guard !hasCompletedMapTutorial, !tutorial.isActive else { return }
+        tutorial.start()
     }
 
     /// Recenters the map on the user when they have not manually moved the focus.
@@ -550,12 +589,14 @@ struct MapHomeView: View {
                 HStack {
                     Spacer()
                     zoomControls
+                        .tutorialAnchor(.zoom)
                 }
                 Spacer()
                 HStack {
                     Spacer()
                     if !isNavigating && !isLiveGuidance {
                         addButton
+                            .tutorialAnchor(.addSpot)
                     }
                 }
             }

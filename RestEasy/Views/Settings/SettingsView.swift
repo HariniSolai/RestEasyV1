@@ -5,6 +5,9 @@ struct SettingsView: View {
     @EnvironmentObject private var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
+    /// Shared with `MapHomeView`; setting it to `false` replays the guided tour.
+    @AppStorage("hasCompletedMapTutorial") private var hasCompletedMapTutorial = false
+
     var body: some View {
         ZStack {
             AppTheme.forestGreen.ignoresSafeArea()
@@ -36,6 +39,20 @@ struct SettingsView: View {
                                     Circle().stroke(.white, lineWidth: 2)
                                 )
                             Text("High Contrast")
+                                .foregroundStyle(AppTheme.cream.opacity(0.85))
+                            Spacer()
+                        }
+                    }
+
+                    Button {
+                        // Reset the flag and dismiss; MapHomeView restarts the tour.
+                        hasCompletedMapTutorial = false
+                        dismiss()
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "questionmark.circle")
+                                .foregroundStyle(AppTheme.cream.opacity(0.85))
+                            Text("Replay Tutorial")
                                 .foregroundStyle(AppTheme.cream.opacity(0.85))
                             Spacer()
                         }
