@@ -161,18 +161,6 @@ struct MapHomeView: View {
                 }
                 .frame(maxHeight: .infinity)
             }
-
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    if !isNavigating && !isLiveGuidance {
-                        addButton
-                    }
-                }
-                .padding(.trailing, 24)
-                .padding(.bottom, selectedSpot == nil || isNavigating || isLiveGuidance ? 24 : 16)
-            }
         }
         .sheet(isPresented: $showUploadSheet) {
             UploadSpotView()
@@ -533,7 +521,7 @@ struct MapHomeView: View {
     }
 
     private var mapSection: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack {
             Map(position: $cameraPosition, selection: $selectedSpot) {
                 ForEach(visibleSpots) { spot in
                     Marker(spot.name, coordinate: spot.coordinate)
@@ -558,8 +546,20 @@ struct MapHomeView: View {
                 showMapSizeSheet = true
             }
 
-            zoomControls
-                .padding(12)
+            VStack {
+                HStack {
+                    Spacer()
+                    zoomControls
+                }
+                Spacer()
+                HStack {
+                    Spacer()
+                    if !isNavigating && !isLiveGuidance {
+                        addButton
+                    }
+                }
+            }
+            .padding(12)
         }
     }
 
